@@ -1,0 +1,6 @@
+[submodule "vendored/madrona"]
+	path = vendored/madrona
+	url = https://github.com/shacklettbp/madrona.git
+[submodule "vendored/SameBoy"]
+	path = vendored/SameBoy
+	url = https://github.com/LIJI32/SameBoy.git
