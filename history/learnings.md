@@ -53,3 +53,4 @@
 - 2026-01-20: SameBoy’s PPU (GB_display_run_scanline / render_line) is stateful and sequential (FIFO, OAM scan, STAT/LY updates per line), so per-world parallelization would require a major PPU rewrite rather than a simple taskgraph change.
 - 2026-01-20: Reset-state caching (CuLE-style) won’t impact current perf measurements because our GPU benchmarks run continuous frames without resets; implementing cache-based resets would require new snapshot/restore plumbing.
 - 2026-01-20: Increasing framesPerStep (batching multiple frames per kernel launch) does not materially improve GPU throughput; gains are marginal at best in current benchmarks.
+- 2026-01-20: There’s no obvious compile-time switch in Madrona MWGPU build to drop physics/geo code paths; pruning them likely requires deeper changes to device megakernel includes or build system.
