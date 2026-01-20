@@ -34,3 +34,4 @@
 - 2026-01-20: Nsight Systems at 512 worlds shows madronaMWGPUMegakernel_256_1_48 dominating frame time (~390 ms per frame); CPU time is mostly cudaStreamSynchronize waiting on that kernel, so the slowness is primarily inside the megakernel.
 - 2026-01-20: Nsight Compute metrics are blocked on this machine (ERR_NVGPUCTRPERM) without enabling GPU performance counters, so deeper kernel metrics require admin/perf-counter enablement.
 - 2026-01-20: Batching multiple frames per step (framesPerStep=4, 512 worlds) did not improve GPU throughput (~1297 fps vs ~1333 fps baseline), so per-launch overhead is not the dominant bottleneck.
+- 2026-01-20: Enabling MADRONA_MWGPU_ENABLE_PGO to build multi-block megakernel variants fails NVJitLink (max-regcount mismatch), blocking occupancy/blocks-per-SM tuning without fixing the regcount constraint.
