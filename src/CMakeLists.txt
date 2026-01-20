@@ -95,7 +95,7 @@ if (TARGET madrona_mw_gpu)
         OUT_TARGET madrona_sameboy_gpu_srcs
         SOURCES_DEFN MADRONA_SAMEBOY_SIM_SRCS
         FLAGS_DEFN MADRONA_SAMEBOY_COMPILE_FLAGS
-        SRCS ${SIMULATOR_SRCS}
+        SRCS ${SIMULATOR_SRCS} ${SAMEBOY_CORE_GPU_TU}
         CUSTOM_FLAGS
             "-I${CMAKE_CURRENT_SOURCE_DIR}"
             "-I${SAMEBOY_CORE_DIR}"
