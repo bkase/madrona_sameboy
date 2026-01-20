@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ ! -d build ]]; then
+  echo "build/ directory not found. Run: cmake -B build -S ." >&2
+  exit 1
+fi
+
+cmake --build build --target headless

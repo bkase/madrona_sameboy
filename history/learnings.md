@@ -20,3 +20,4 @@
 - 2026-01-20: compare_cpu_gpu now supports --report JSON output and docs/determinism.md defines zero-drift thresholds.
 - 2026-01-20: compare_cpu_gpu --report build/diff_report.json writes JSON even on failure; cpu_instrs.gb 120f still diverges across WRAM/VRAM/MBC/obs/regs.
 - 2026-01-20: headless cpu_instrs.gb passes at 12000 frames on CPU; headless_gpu 12000f did not complete within 120s/300s/600s timeouts (still running after init).
+- 2026-01-20: Enabled warnings-as-errors for project targets; SameBoy headers are treated as system and sameboy_core suppresses multichar/unused-result warnings so Werror builds succeed.

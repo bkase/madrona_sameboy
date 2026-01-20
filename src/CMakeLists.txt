@@ -32,13 +32,34 @@ set(SAMEBOY_COMMON_DEFS
     GB_DMG_ONLY
 )
 
+option(MADRONA_SAMEBOY_WERROR "Treat warnings as errors for project targets" ON)
+
+function(madrona_sameboy_enable_werror target)
+    if (NOT MADRONA_SAMEBOY_WERROR)
+        return()
+    endif()
+
+    if (MSVC)
+        target_compile_options(${target} PRIVATE /WX)
+    else()
+        target_compile_options(${target} PRIVATE -Werror)
+    endif()
+endfunction()
+
 add_library(sameboy_core STATIC ${SAMEBOY_CORE_SRCS})
-target_include_directories(sameboy_core PUBLIC ${SAMEBOY_CORE_DIR})
+target_include_directories(sameboy_core SYSTEM PUBLIC ${SAMEBOY_CORE_DIR})
 target_compile_definitions(sameboy_core PRIVATE
     ${SAMEBOY_COMMON_DEFS}
     GB_VERSION=\"0.0\"
     _GNU_SOURCE  # For ssize_t on Linux
 )
+if (FRONTEND_GCC OR FRONTEND_CLANG)
+    target_compile_options(sameboy_core PRIVATE
+        -Wno-multichar
+        -Wno-unused-result
+    )
+endif()
+madrona_sameboy_enable_werror(sameboy_core)
 
 set(SIMULATOR_SRCS
     consts.hpp
@@ -48,7 +69,7 @@ set(SIMULATOR_SRCS
 )
 
 add_library(madrona_sameboy_sim STATIC ${SIMULATOR_SRCS})
-target_include_directories(madrona_sameboy_sim PUBLIC ${SAMEBOY_CORE_DIR})
+target_include_directories(madrona_sameboy_sim SYSTEM PUBLIC ${SAMEBOY_CORE_DIR})
 target_compile_definitions(madrona_sameboy_sim PUBLIC
     ${SAMEBOY_COMMON_DEFS}
 )
@@ -57,6 +78,7 @@ target_link_libraries(madrona_sameboy_sim
         madrona_mw_core
         sameboy_core
 )
+madrona_sameboy_enable_werror(madrona_sameboy_sim)
 
 find_package(OpenGL QUIET)
 
@@ -75,6 +97,7 @@ if (OpenGL_FOUND)
     target_compile_definitions(viewer PRIVATE
         DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
     )
+    madrona_sameboy_enable_werror(viewer)
 else()
     message(STATUS "OpenGL not found, skipping viewer build")
 endif()
@@ -91,6 +114,7 @@ target_link_libraries(headless PRIVATE
 target_compile_definitions(headless PRIVATE
     DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
 )
+madrona_sameboy_enable_werror(headless)
 
 # GPU support - only if CUDA 12+ is available
 if (TARGET madrona_mw_gpu)
@@ -129,6 +153,7 @@ if (TARGET madrona_mw_gpu)
     target_compile_definitions(headless_gpu PRIVATE
         DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
     )
+    madrona_sameboy_enable_werror(headless_gpu)
 
     add_executable(compare_cpu_gpu compare_cpu_gpu.cpp)
 
@@ -144,4 +169,5 @@ if (TARGET madrona_mw_gpu)
     target_compile_definitions(compare_cpu_gpu PRIVATE
         DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
     )
+    madrona_sameboy_enable_werror(compare_cpu_gpu)
 endif()

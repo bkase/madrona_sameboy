@@ -87,12 +87,17 @@ static uint32_t decodeTileMapMode(const GBVram &vram, uint16_t map_base,
 static bool decodeTileMapBest(const GBVram &vram, const GBState &state,
                               char *out, size_t out_size)
 {
+    constexpr size_t kTileBufSize = 18 * 21 + 1;
+    if (out_size < kTileBufSize) {
+        return false;
+    }
+
     uint8_t lcdc = state.gb.io_registers[GB_IO_LCDC];
     uint16_t bg_base = (lcdc & 0x08) ? 0x1C00 : 0x1800;
     uint16_t win_base = (lcdc & 0x40) ? 0x1C00 : 0x1800;
 
     const uint8_t offsets[] = {0x00, 0x20, 0x10, 0x30};
-    char best_buf[18 * 21 + 1];
+    char best_buf[kTileBufSize];
     best_buf[0] = '\0';
     uint32_t best_score = 0;
 
@@ -101,13 +106,13 @@ static bool decodeTileMapBest(const GBVram &vram, const GBState &state,
                                            best_buf, sizeof(best_buf));
         if (score > best_score) {
             best_score = score;
-            std::memcpy(out, best_buf, sizeof(best_buf));
+            std::memcpy(out, best_buf, kTileBufSize);
         }
         uint32_t win_score = decodeTileMapMode(vram, win_base, offset,
                                                best_buf, sizeof(best_buf));
         if (win_score > best_score) {
             best_score = win_score;
-            std::memcpy(out, best_buf, sizeof(best_buf));
+            std::memcpy(out, best_buf, kTileBufSize);
         }
     }
 
