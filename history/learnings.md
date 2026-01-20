@@ -17,3 +17,5 @@
 - 2026-01-20: compare_cpu_gpu harness hashes WRAM/VRAM/MBC RAM; cpu_instrs.gb 120f currently mismatches across all three buffers.
 - 2026-01-20: compare_cpu_gpu now also hashes packed observations; cpu_instrs.gb 120f mismatches ObsPacked too.
 - 2026-01-20: compare_cpu_gpu now exports per-frame PC/SP/LY/STAT; cpu_instrs.gb 120f shows register mismatch too.
+- 2026-01-20: compare_cpu_gpu now supports --report JSON output and docs/determinism.md defines zero-drift thresholds.
+- 2026-01-20: compare_cpu_gpu --report build/diff_report.json writes JSON even on failure; cpu_instrs.gb 120f still diverges across WRAM/VRAM/MBC/obs/regs.

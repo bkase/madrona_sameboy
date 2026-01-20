@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <string>
 #include <vector>
 
 #include <cuda_runtime.h>
@@ -88,6 +89,70 @@ struct DiffSummary {
     uint8_t gpu_value;
 };
 
+struct BufferReport {
+    uint64_t cpu_hash;
+    uint64_t gpu_hash;
+    DiffSummary diff;
+    bool match;
+};
+
+struct RegsReport {
+    bool match;
+    GBRegs cpu;
+    GBRegs gpu;
+};
+
+struct WorldReport {
+    uint32_t world;
+    BufferReport wram;
+    BufferReport vram;
+    BufferReport mbc;
+    BufferReport obs;
+    RegsReport regs;
+};
+
+static std::string hex64(uint64_t value)
+{
+    char buf[19];
+    std::snprintf(buf, sizeof(buf), "0x%016" PRIx64, value);
+    return std::string(buf);
+}
+
+static std::string jsonEscape(const char *value)
+{
+    std::string out;
+    for (const char *ptr = value; *ptr != '\0'; ++ptr) {
+        switch (*ptr) {
+        case '\\':
+            out += "\\\\";
+            break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        default:
+            if (static_cast<unsigned char>(*ptr) < 0x20) {
+                char buf[7];
+                std::snprintf(buf, sizeof(buf), "\\u%04x",
+                              static_cast<unsigned char>(*ptr));
+                out += buf;
+            } else {
+                out += *ptr;
+            }
+            break;
+        }
+    }
+    return out;
+}
+
 static DiffSummary diffBytes(const uint8_t *cpu, const uint8_t *gpu, size_t size)
 {
     DiffSummary diff {0, 0, 0, 0};
@@ -105,24 +170,105 @@ static DiffSummary diffBytes(const uint8_t *cpu, const uint8_t *gpu, size_t size
     return diff;
 }
 
-static bool reportDiff(const char *label, uint64_t cpu_hash, uint64_t gpu_hash,
-                       const uint8_t *cpu, const uint8_t *gpu, size_t size)
+static BufferReport reportDiff(const char *label, const uint8_t *cpu,
+                               const uint8_t *gpu, size_t size)
 {
-    if (cpu_hash == gpu_hash) {
-        printf("%s hash: 0x%016" PRIx64 " (match)\n", label, cpu_hash);
-        return true;
+    BufferReport report {};
+    report.cpu_hash = hashBytes(cpu, size);
+    report.gpu_hash = hashBytes(gpu, size);
+    if (report.cpu_hash == report.gpu_hash) {
+        printf("%s hash: 0x%016" PRIx64 " (match)\n", label, report.cpu_hash);
+        report.match = true;
+        report.diff = {0, 0, 0, 0};
+        return report;
     }
 
     printf("%s hash mismatch: cpu=0x%016" PRIx64 " gpu=0x%016" PRIx64 "\n",
-           label, cpu_hash, gpu_hash);
-    DiffSummary diff = diffBytes(cpu, gpu, size);
-    printf("  mismatches: %zu", diff.mismatches);
-    if (diff.mismatches > 0) {
+           label, report.cpu_hash, report.gpu_hash);
+    report.match = false;
+    report.diff = diffBytes(cpu, gpu, size);
+    printf("  mismatches: %zu", report.diff.mismatches);
+    if (report.diff.mismatches > 0) {
         printf(", first@0x%zx cpu=0x%02x gpu=0x%02x",
-               diff.first_index, diff.cpu_value, diff.gpu_value);
+               report.diff.first_index, report.diff.cpu_value,
+               report.diff.gpu_value);
     }
     printf("\n");
-    return false;
+    return report;
+}
+
+static void printUsage(const char *exe)
+{
+    printf("Usage: %s [rom] [frames] [worlds] [gpu_id] [--report path]\n", exe);
+}
+
+static bool writeReport(const char *path, const char *rom_path, uint32_t frames,
+                        uint32_t worlds, const std::vector<WorldReport> &reports,
+                        bool all_match)
+{
+    std::ofstream out(path);
+    if (!out.is_open()) {
+        return false;
+    }
+
+    out << "{\n";
+    out << "  \"rom\": \"" << jsonEscape(rom_path) << "\",\n";
+    out << "  \"frames\": " << frames << ",\n";
+    out << "  \"worlds\": " << worlds << ",\n";
+    out << "  \"thresholds\": {\n";
+    out << "    \"allowed_mismatches\": 0,\n";
+    out << "    \"regs_match_required\": true\n";
+    out << "  },\n";
+    out << "  \"world_results\": [\n";
+
+    for (size_t i = 0; i < reports.size(); i++) {
+        const WorldReport &world = reports[i];
+        out << "    {\n";
+        out << "      \"world\": " << world.world << ",\n";
+        out << "      \"buffers\": {\n";
+
+        auto writeBuffer = [&out](const char *name, const BufferReport &buffer, bool last) {
+            out << "        \"" << name << "\": {\n";
+            out << "          \"match\": " << (buffer.match ? "true" : "false") << ",\n";
+            out << "          \"cpu_hash\": \"" << hex64(buffer.cpu_hash) << "\",\n";
+            out << "          \"gpu_hash\": \"" << hex64(buffer.gpu_hash) << "\",\n";
+            out << "          \"mismatches\": " << buffer.diff.mismatches << ",\n";
+            out << "          \"first_index\": " << buffer.diff.first_index << ",\n";
+            out << "          \"cpu_value\": "
+                << static_cast<unsigned>(buffer.diff.cpu_value) << ",\n";
+            out << "          \"gpu_value\": "
+                << static_cast<unsigned>(buffer.diff.gpu_value) << "\n";
+            out << "        }" << (last ? "" : ",") << "\n";
+        };
+
+        writeBuffer("wram", world.wram, false);
+        writeBuffer("vram", world.vram, false);
+        writeBuffer("mbc_ram", world.mbc, false);
+        writeBuffer("obs_packed", world.obs, true);
+
+        out << "      },\n";
+        out << "      \"regs\": {\n";
+        out << "        \"match\": " << (world.regs.match ? "true" : "false") << ",\n";
+        out << "        \"cpu\": {\n";
+        out << "          \"pc\": " << world.regs.cpu.pc << ",\n";
+        out << "          \"sp\": " << world.regs.cpu.sp << ",\n";
+        out << "          \"ly\": " << static_cast<unsigned>(world.regs.cpu.ly) << ",\n";
+        out << "          \"stat\": " << static_cast<unsigned>(world.regs.cpu.stat) << "\n";
+        out << "        },\n";
+        out << "        \"gpu\": {\n";
+        out << "          \"pc\": " << world.regs.gpu.pc << ",\n";
+        out << "          \"sp\": " << world.regs.gpu.sp << ",\n";
+        out << "          \"ly\": " << static_cast<unsigned>(world.regs.gpu.ly) << ",\n";
+        out << "          \"stat\": " << static_cast<unsigned>(world.regs.gpu.stat) << "\n";
+        out << "        }\n";
+        out << "      }\n";
+        out << "    }" << (i + 1 < reports.size() ? "," : "") << "\n";
+    }
+
+    out << "  ],\n";
+    out << "  \"all_match\": " << (all_match ? "true" : "false") << "\n";
+    out << "}\n";
+    return true;
 }
 
 int main(int argc, char **argv)
@@ -131,21 +277,44 @@ int main(int argc, char **argv)
     uint32_t num_frames = 120;
     uint32_t num_worlds = 1;
     int gpu_id = 0;
+    const char *report_path = nullptr;
 
-    if (argc >= 2) {
-        rom_path = argv[1];
+    std::vector<const char *> positional;
+    positional.reserve(argc);
+    for (int i = 1; i < argc; i++) {
+        if (std::strcmp(argv[i], "--help") == 0 || std::strcmp(argv[i], "-h") == 0) {
+            printUsage(argv[0]);
+            return 0;
+        }
+        if (std::strcmp(argv[i], "--report") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "--report requires a path\n");
+                return 2;
+            }
+            report_path = argv[++i];
+            continue;
+        }
+        if (std::strncmp(argv[i], "--report=", 9) == 0) {
+            report_path = argv[i] + 9;
+            continue;
+        }
+        positional.push_back(argv[i]);
     }
-    if (argc >= 3) {
-        num_frames = static_cast<uint32_t>(std::strtoul(argv[2], nullptr, 10));
+
+    if (positional.size() >= 1) {
+        rom_path = positional[0];
     }
-    if (argc >= 4) {
-        num_worlds = static_cast<uint32_t>(std::strtoul(argv[3], nullptr, 10));
+    if (positional.size() >= 2) {
+        num_frames = static_cast<uint32_t>(std::strtoul(positional[1], nullptr, 10));
+    }
+    if (positional.size() >= 3) {
+        num_worlds = static_cast<uint32_t>(std::strtoul(positional[2], nullptr, 10));
         if (num_worlds == 0) {
             num_worlds = 1;
         }
     }
-    if (argc >= 5) {
-        gpu_id = static_cast<int>(std::strtol(argv[4], nullptr, 10));
+    if (positional.size() >= 4) {
+        gpu_id = static_cast<int>(std::strtol(positional[3], nullptr, 10));
     }
 
     std::vector<uint8_t> rom_data;
@@ -275,51 +444,61 @@ int main(int argc, char **argv)
     cudaFree(d_rom);
 
     bool all_match = true;
+    std::vector<WorldReport> world_reports;
+    world_reports.reserve(num_worlds);
     for (uint32_t i = 0; i < num_worlds; i++) {
-        uint64_t cpu_wram_hash = hashBytes(cpu_wram[i].data, sizeof(cpu_wram[i].data));
-        uint64_t cpu_vram_hash = hashBytes(cpu_vram[i].data, sizeof(cpu_vram[i].data));
-        uint64_t cpu_mbc_hash = hashBytes(cpu_mbc[i].data, sizeof(cpu_mbc[i].data));
         GBObsPacked cpu_packed {};
         GBObsPacked gpu_packed {};
         packObs(cpu_obs[i], cpu_packed);
         packObs(h_obs[i], gpu_packed);
-        uint64_t cpu_obs_hash = hashBytes(cpu_packed.bytes, sizeof(cpu_packed.bytes));
-        uint64_t gpu_obs_hash = hashBytes(gpu_packed.bytes, sizeof(gpu_packed.bytes));
-
-        uint64_t gpu_wram_hash = hashBytes(h_wram[i].data, sizeof(h_wram[i].data));
-        uint64_t gpu_vram_hash = hashBytes(h_vram[i].data, sizeof(h_vram[i].data));
-        uint64_t gpu_mbc_hash = hashBytes(h_mbc[i].data, sizeof(h_mbc[i].data));
 
         if (num_worlds > 1) {
             printf("World %u:\n", i);
         }
 
-        bool wram_match = reportDiff("WRAM", cpu_wram_hash, gpu_wram_hash,
-                                     cpu_wram[i].data, h_wram[i].data,
-                                     sizeof(cpu_wram[i].data));
-        bool vram_match = reportDiff("VRAM", cpu_vram_hash, gpu_vram_hash,
-                                     cpu_vram[i].data, h_vram[i].data,
-                                     sizeof(cpu_vram[i].data));
-        bool mbc_match = reportDiff("MBC RAM", cpu_mbc_hash, gpu_mbc_hash,
-                                    cpu_mbc[i].data, h_mbc[i].data,
-                                    sizeof(cpu_mbc[i].data));
-        bool obs_match = reportDiff("ObsPacked", cpu_obs_hash, gpu_obs_hash,
-                                    cpu_packed.bytes, gpu_packed.bytes,
-                                    sizeof(cpu_packed.bytes));
+        BufferReport wram_report = reportDiff("WRAM", cpu_wram[i].data,
+                                              h_wram[i].data,
+                                              sizeof(cpu_wram[i].data));
+        BufferReport vram_report = reportDiff("VRAM", cpu_vram[i].data,
+                                              h_vram[i].data,
+                                              sizeof(cpu_vram[i].data));
+        BufferReport mbc_report = reportDiff("MBC RAM", cpu_mbc[i].data,
+                                             h_mbc[i].data,
+                                             sizeof(cpu_mbc[i].data));
+        BufferReport obs_report = reportDiff("ObsPacked", cpu_packed.bytes,
+                                             gpu_packed.bytes,
+                                             sizeof(cpu_packed.bytes));
 
-        bool regs_match = true;
+        RegsReport regs_report {};
         const GBRegs &cpu_reg = cpu_regs[i];
         const GBRegs &gpu_reg = h_regs[i];
+        regs_report.cpu = cpu_reg;
+        regs_report.gpu = gpu_reg;
         if (cpu_reg.pc != gpu_reg.pc || cpu_reg.sp != gpu_reg.sp ||
             cpu_reg.ly != gpu_reg.ly || cpu_reg.stat != gpu_reg.stat) {
-            regs_match = false;
+            regs_report.match = false;
             printf("Regs mismatch: cpu PC=0x%04x SP=0x%04x LY=%u STAT=0x%02x "
                    "gpu PC=0x%04x SP=0x%04x LY=%u STAT=0x%02x\n",
                    cpu_reg.pc, cpu_reg.sp, cpu_reg.ly, cpu_reg.stat,
                    gpu_reg.pc, gpu_reg.sp, gpu_reg.ly, gpu_reg.stat);
+        } else {
+            regs_report.match = true;
         }
 
-        all_match = all_match && wram_match && vram_match && mbc_match && obs_match && regs_match;
+        world_reports.push_back(WorldReport {
+            i, wram_report, vram_report, mbc_report, obs_report, regs_report
+        });
+
+        all_match = all_match && wram_report.match && vram_report.match &&
+            mbc_report.match && obs_report.match && regs_report.match;
+    }
+
+    if (report_path != nullptr) {
+        if (!writeReport(report_path, rom_path, num_frames, num_worlds,
+                         world_reports, all_match)) {
+            fprintf(stderr, "Failed to write report: %s\n", report_path);
+            return 2;
+        }
     }
 
     return all_match ? 0 : 1;
