@@ -30,3 +30,4 @@
 - 2026-01-20: Benchmark results (120 frames): CPU ~30–37k total FPS for 64–256 worlds; GPU ~425 total FPS (64 worlds) and ~783 total FPS (256 worlds), so GPU throughput is far below CPU in current madrona setup.
 - 2026-01-20: CuLE paper notes: renders frames directly on GPU to avoid CPU↔GPU bandwidth; reports up to ~155M frames/hour per GPU; only 25% of raw frames are rendered for training; CPU per-env FPS can beat GPU for ≤128 envs but GPU scales better with many envs.
 - 2026-01-20: CuLE repo examples emphasize large env counts (e.g., 1200 ALEs) and minibatching with --use-cuda-env; design centers on GPU envs + batching (torchcule), suggesting throughput gains rely on many parallel envs.
+- 2026-01-20: GPU benchmark sweep up to 1024 worlds still tops out ~1,966 FPS total (1.92 FPS/world), far below CPU ~39–40k FPS total, so scaling alone does not close the gap in current madrona setup.
