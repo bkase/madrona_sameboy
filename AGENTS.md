@@ -63,6 +63,7 @@ git push                # Push to remote
 - Update status as you work (in_progress → closed)
 - Create new issues with `br create` when you discover tasks
 - Use descriptive titles and set appropriate priority/type
+- Cap test timeouts at 2 minutes; if a test exceeds that, treat it as a bug and investigate
 - Always sync before ending session
 
 <!-- end-br-agent-instructions -->
@@ -126,6 +127,7 @@ git push                # Push to remote
 - Update status as you work (in_progress → closed)
 - Create new issues with `bd create` when you discover tasks
 - Use descriptive titles and set appropriate priority/type
+- Cap test timeouts at 2 minutes; if a test exceeds that, treat it as a bug and investigate
 - Always `bd sync` before ending session
 
 <!-- end-bv-agent-instructions -->
