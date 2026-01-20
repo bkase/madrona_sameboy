@@ -1,0 +1,196 @@
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <vector>
+
+#include <cuda_runtime.h>
+
+#include <madrona/mw_gpu.hpp>
+
+#include "sim.hpp"
+#include "consts.hpp"
+
+using namespace madrona;
+using namespace madSameBoy;
+
+#ifndef MADRONA_SAMEBOY_SIM_SRCS
+#define MADRONA_SAMEBOY_SIM_SRCS
+#endif
+
+#ifndef MADRONA_SAMEBOY_COMPILE_FLAGS
+#define MADRONA_SAMEBOY_COMPILE_FLAGS
+#endif
+
+static bool readFile(const char *path, std::vector<uint8_t> &out)
+{
+    std::ifstream f(path, std::ios::binary | std::ios::ate);
+    if (!f.is_open()) {
+        return false;
+    }
+
+    std::streamsize size = f.tellg();
+    f.seekg(0, std::ios::beg);
+
+    if (size <= 0) {
+        return false;
+    }
+
+    out.resize(static_cast<size_t>(size));
+    if (!f.read(reinterpret_cast<char *>(out.data()), size)) {
+        return false;
+    }
+
+    return true;
+}
+
+static size_t roundedRomSize(size_t size)
+{
+    size = (size + 0x3FFF) & ~size_t(0x3FFF);
+    while (size & (size - 1)) {
+        size |= size >> 1;
+        size++;
+    }
+    if (size < 0x8000) {
+        size = 0x8000;
+    }
+    return size;
+}
+
+int main(int argc, char **argv)
+{
+    const char *rom_path = DEFAULT_ROM_PATH;
+    uint32_t max_frames = 12000;
+    uint32_t num_worlds = 1;
+    int gpu_id = 0;
+
+    if (argc >= 2) {
+        rom_path = argv[1];
+    }
+    if (argc >= 3) {
+        max_frames = static_cast<uint32_t>(std::strtoul(argv[2], nullptr, 10));
+    }
+    if (argc >= 4) {
+        num_worlds = static_cast<uint32_t>(std::strtoul(argv[3], nullptr, 10));
+        if (num_worlds == 0) {
+            num_worlds = 1;
+        }
+    }
+    if (argc >= 5) {
+        gpu_id = static_cast<int>(std::strtol(argv[4], nullptr, 10));
+    }
+
+    std::vector<uint8_t> rom_data;
+    if (!readFile(rom_path, rom_data)) {
+        fprintf(stderr, "Failed to read ROM: %s\n", rom_path);
+        return 2;
+    }
+
+    size_t padded_size = roundedRomSize(rom_data.size());
+    std::vector<uint8_t> rom_padded(padded_size, 0xFF);
+    std::memcpy(rom_padded.data(), rom_data.data(), rom_data.size());
+
+    Sim::Config sim_cfg {};
+    sim_cfg.romData = rom_padded.data();
+    sim_cfg.romSize = rom_padded.size();
+
+    std::vector<Sim::WorldInit> world_inits(num_worlds);
+
+    // Initialize CUDA
+    CUcontext cu_ctx = MWCudaExecutor::initCUDA(gpu_id);
+
+    // Source files for GPU compilation
+    static const char *user_sources[] = {
+        MADRONA_SAMEBOY_SIM_SRCS
+    };
+
+    static const char *user_compile_flags[] = {
+        MADRONA_SAMEBOY_COMPILE_FLAGS
+    };
+
+    StateConfig state_cfg {
+        .worldInitPtr = world_inits.data(),
+        .numWorldInitBytes = sizeof(Sim::WorldInit),
+        .userConfigPtr = &sim_cfg,
+        .numUserConfigBytes = sizeof(Sim::Config),
+        .numWorldDataBytes = sizeof(Sim),
+        .worldDataAlignment = alignof(Sim),
+        .numWorlds = num_worlds,
+        .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
+        .numExportedBuffers = (uint32_t)ExportID::NumExports,
+    };
+
+    CompileConfig compile_cfg {
+        .userSources = {user_sources, std::size(user_sources)},
+        .userCompileFlags = {user_compile_flags, std::size(user_compile_flags)},
+        .optMode = CompileConfig::OptMode::LTO,
+    };
+
+    fprintf(stderr, "Compiling GPU kernels for %u worlds...\n", num_worlds);
+
+    MWCudaExecutor exec(state_cfg, compile_cfg, cu_ctx);
+
+    // Build launch graph for step taskgraph
+    MWCudaLaunchGraph step_graph = exec.buildLaunchGraph(TaskGraphID::Step);
+
+    // GPU pointers to exported columns
+    GBInput *d_input = static_cast<GBInput *>(
+        exec.getExported((uint32_t)ExportID::Input));
+    GBObs *d_obs = static_cast<GBObs *>(
+        exec.getExported((uint32_t)ExportID::Observation));
+
+    // Host buffers for reading back results
+    std::vector<GBInput> h_input(num_worlds);
+    std::vector<GBObs> h_obs(num_worlds);
+
+    // Initialize inputs to zero (no buttons pressed)
+    for (auto &in : h_input) {
+        in.buttons = 0;
+    }
+    cudaMemcpy(d_input, h_input.data(), sizeof(GBInput) * num_worlds,
+               cudaMemcpyHostToDevice);
+
+    fprintf(stderr, "Running %u frames on GPU...\n", max_frames);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (uint32_t frame = 0; frame < max_frames; frame++) {
+        exec.run(step_graph);
+    }
+
+    // Sync to ensure all work is done
+    cudaDeviceSynchronize();
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    // Copy observation back to check results
+    cudaMemcpy(h_obs.data(), d_obs, sizeof(GBObs) * num_worlds,
+               cudaMemcpyDeviceToHost);
+
+    // Calculate performance metrics
+    double total_seconds = duration.count() / 1000000.0;
+    double frames_per_sec = (double)(max_frames * num_worlds) / total_seconds;
+    double fps_per_world = (double)max_frames / total_seconds;
+
+    // Check observation pixel range
+    uint8_t min_pix = 255;
+    uint8_t max_pix = 0;
+    for (uint32_t i = 0; i < consts::screenPixels; i++) {
+        uint8_t v = h_obs[0].pixels[i];
+        if (v < min_pix) min_pix = v;
+        if (v > max_pix) max_pix = v;
+    }
+
+    printf("GPU Performance Results:\n");
+    printf("  Worlds: %u\n", num_worlds);
+    printf("  Frames per world: %u\n", max_frames);
+    printf("  Total frames: %u\n", max_frames * num_worlds);
+    printf("  Time: %.3f seconds\n", total_seconds);
+    printf("  Total throughput: %.2f frames/sec\n", frames_per_sec);
+    printf("  Per-world rate: %.2f FPS\n", fps_per_world);
+    printf("  Observation range: [%u, %u]\n", min_pix, max_pix);
+
+    return 0;
+}

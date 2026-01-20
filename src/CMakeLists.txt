@@ -27,6 +27,7 @@ target_compile_definitions(sameboy_core PRIVATE
     GB_DISABLE_CHEATS
     GB_DISABLE_CHEAT_SEARCH
     GB_DISABLE_REWIND
+    _GNU_SOURCE  # For ssize_t on Linux
 )
 
 set(SIMULATOR_SRCS
@@ -51,22 +52,26 @@ target_link_libraries(madrona_sameboy_sim
         sameboy_core
 )
 
-find_package(OpenGL REQUIRED)
+find_package(OpenGL QUIET)
 
-add_executable(viewer viewer.cpp)
+if (OpenGL_FOUND)
+    add_executable(viewer viewer.cpp)
 
-target_link_libraries(viewer PRIVATE
-    madrona_mw_cpu
-    madrona_mw_core
-    madrona_common
-    madrona_sameboy_sim
-    glfw
-    OpenGL::GL
-)
+    target_link_libraries(viewer PRIVATE
+        madrona_mw_cpu
+        madrona_mw_core
+        madrona_common
+        madrona_sameboy_sim
+        glfw
+        OpenGL::GL
+    )
 
-target_compile_definitions(viewer PRIVATE
-    DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
-)
+    target_compile_definitions(viewer PRIVATE
+        DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
+    )
+else()
+    message(STATUS "OpenGL not found, skipping viewer build")
+endif()
 
 add_executable(headless headless.cpp)
 
@@ -80,3 +85,36 @@ target_link_libraries(headless PRIVATE
 target_compile_definitions(headless PRIVATE
     DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
 )
+
+# GPU support - only if CUDA 12+ is available
+if (TARGET madrona_mw_gpu)
+    # Build compile definitions for GPU runtime compilation
+    madrona_build_compile_defns(
+        OUT_TARGET madrona_sameboy_gpu_srcs
+        SOURCES_DEFN MADRONA_SAMEBOY_SIM_SRCS
+        FLAGS_DEFN MADRONA_SAMEBOY_COMPILE_FLAGS
+        SRCS ${SIMULATOR_SRCS}
+        CUSTOM_FLAGS
+            "-I${CMAKE_CURRENT_SOURCE_DIR}"
+            "-I${SAMEBOY_CORE_DIR}"
+            "-DGB_INTERNAL"
+            "-DGB_DISABLE_DEBUGGER"
+            "-DGB_DISABLE_CHEATS"
+            "-DGB_DISABLE_CHEAT_SEARCH"
+            "-DGB_DISABLE_REWIND"
+    )
+
+    add_executable(headless_gpu headless_gpu.cpp)
+
+    target_link_libraries(headless_gpu PRIVATE
+        madrona_mw_gpu
+        madrona_mw_core
+        madrona_common
+        madrona_sameboy_sim
+        madrona_sameboy_gpu_srcs
+    )
+
+    target_compile_definitions(headless_gpu PRIVATE
+        DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
+    )
+endif()

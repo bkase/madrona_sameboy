@@ -1,4 +1,5 @@
 #include <array>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -184,6 +185,8 @@ int main(int argc, char **argv)
         buf[0] = '\0';
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     for (uint32_t frame = 0; frame < max_frames; frame++) {
         exec.run();
         bool all_done = true;
@@ -213,6 +216,9 @@ int main(int argc, char **argv)
         }
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
     auto &serial0 = *worlds[0].serial;
     if (serial0.length > 0) {
         fputs(serial0.text, stdout);
@@ -238,6 +244,19 @@ int main(int argc, char **argv)
     fprintf(stderr, "PC=0x%04X SP=0x%04X LCDC=0x%02X\n",
             worlds[0].state->gb.pc, worlds[0].state->gb.sp,
             worlds[0].state->gb.io_registers[GB_IO_LCDC]);
+
+    // Performance output
+    double total_seconds = duration.count() / 1000000.0;
+    double frames_per_sec = (double)(max_frames * num_worlds) / total_seconds;
+    double fps_per_world = (double)max_frames / total_seconds;
+
+    fprintf(stderr, "\nCPU Performance Results:\n");
+    fprintf(stderr, "  Worlds: %u\n", num_worlds);
+    fprintf(stderr, "  Frames per world: %u\n", max_frames);
+    fprintf(stderr, "  Total frames: %u\n", max_frames * num_worlds);
+    fprintf(stderr, "  Time: %.3f seconds\n", total_seconds);
+    fprintf(stderr, "  Total throughput: %.2f frames/sec\n", frames_per_sec);
+    fprintf(stderr, "  Per-world rate: %.2f FPS\n", fps_per_world);
 
     bool any_fail = false;
     bool all_pass = true;
