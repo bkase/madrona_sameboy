@@ -32,3 +32,4 @@
 - 2026-01-20: CuLE repo examples emphasize large env counts (e.g., 1200 ALEs) and minibatching with --use-cuda-env; design centers on GPU envs + batching (torchcule), suggesting throughput gains rely on many parallel envs.
 - 2026-01-20: GPU benchmark sweep up to 1024 worlds still tops out ~1,966 FPS total (1.92 FPS/world), far below CPU ~39–40k FPS total, so scaling alone does not close the gap in current madrona setup.
 - 2026-01-20: Nsight Systems at 512 worlds shows madronaMWGPUMegakernel_256_1_48 dominating frame time (~390 ms per frame); CPU time is mostly cudaStreamSynchronize waiting on that kernel, so the slowness is primarily inside the megakernel.
+- 2026-01-20: Nsight Compute metrics are blocked on this machine (ERR_NVGPUCTRPERM) without enabling GPU performance counters, so deeper kernel metrics require admin/perf-counter enablement.
