@@ -234,6 +234,9 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
 
     gb->rom = cfg.romData;
     gb->rom_size = (uint32_t)cfg.romSize;
+    gb->ram_is_external = true;
+    gb->vram_is_external = true;
+    gb->rom_is_external = true;
 #endif
 
     GB_configure_cart(gb);
@@ -256,6 +259,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     } else {
         gb->mbc_ram = mbc.data;
     }
+    gb->mbc_ram_is_external = true;
 #endif
 
     GB_set_border_mode(gb, GB_BORDER_NEVER);
