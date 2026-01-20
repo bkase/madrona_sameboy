@@ -145,6 +145,7 @@ int main(int argc, char **argv)
     sim_cfg.romSize = rom_padded.size();
     sim_cfg.disableRendering = 0;
     sim_cfg.framesPerStep = 1;
+    sim_cfg.useNullStep = 0;
 
     constexpr uint32_t num_worlds = 1;
     std::vector<Sim::WorldInit> world_inits(num_worlds);

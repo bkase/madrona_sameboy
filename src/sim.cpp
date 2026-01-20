@@ -128,6 +128,24 @@ void simTick(Engine &ctx, GBState &state, GBRam &wram, GBVram &vram,
     if (frames_per_step == 0) {
         frames_per_step = 1;
     }
+    if (ctx.data().useNullStep) {
+        for (uint32_t frame_idx = 0; frame_idx < frames_per_step; frame_idx++) {
+            uint8_t acc = wram.data[0] ^ vram.data[0] ^ mbc.data[0] ^
+                static_cast<uint8_t>(frame.pixels[0]) ^ input.buttons ^
+                static_cast<uint8_t>(frame_idx);
+            wram.data[0] = acc;
+            vram.data[0] = acc;
+            mbc.data[0] = acc;
+            frame.pixels[0] = acc;
+            obs.pixels[0] = acc & 3;
+            regs.pc = acc;
+            regs.sp = acc;
+            regs.ly = acc;
+            regs.stat = acc;
+        }
+        return;
+    }
+
     for (uint32_t frame_idx = 0; frame_idx < frames_per_step; frame_idx++) {
         applyInput(gb, input.buttons);
         GB_run_frame(gb);
@@ -192,6 +210,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     machine = ctx.makeEntity<GBMachine>();
     disableRendering = cfg.disableRendering;
     framesPerStep = cfg.framesPerStep == 0 ? 1u : cfg.framesPerStep;
+    useNullStep = cfg.useNullStep;
 
     auto &state = ctx.get<GBState>(machine);
     auto &wram = ctx.get<GBRam>(machine);

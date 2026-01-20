@@ -127,6 +127,7 @@ int main(int argc, char **argv)
     uint32_t num_workers = 0;
     uint32_t frames_per_step = 1;
     bool benchmark_only = false;
+    bool null_step = false;
 
     std::vector<const char *> positional;
     positional.reserve(static_cast<size_t>(argc));
@@ -135,6 +136,11 @@ int main(int argc, char **argv)
         if (std::strcmp(arg, "--benchmark") == 0 ||
             std::strcmp(arg, "--bench") == 0) {
             benchmark_only = true;
+            continue;
+        }
+        if (std::strcmp(arg, "--null-step") == 0 ||
+            std::strcmp(arg, "--null") == 0) {
+            null_step = true;
             continue;
         }
         if (arg[0] == '-') {
@@ -185,6 +191,7 @@ int main(int argc, char **argv)
     sim_cfg.romSize = rom_padded.size();
     sim_cfg.disableRendering = benchmark_only ? 1u : 0u;
     sim_cfg.framesPerStep = frames_per_step;
+    sim_cfg.useNullStep = null_step ? 1u : 0u;
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 

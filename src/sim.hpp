@@ -33,6 +33,7 @@ struct Sim : public madrona::WorldBase {
         size_t romSize;
         uint32_t disableRendering;
         uint32_t framesPerStep;
+        uint32_t useNullStep;
     };
 
     struct WorldInit {};
@@ -47,6 +48,7 @@ struct Sim : public madrona::WorldBase {
     madrona::Entity machine;
     uint32_t disableRendering;
     uint32_t framesPerStep;
+    uint32_t useNullStep;
 };
 
 class Engine : public madrona::CustomContext<Engine, Sim> {
