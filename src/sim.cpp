@@ -149,6 +149,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.exportColumn<GBMachine, GBInput>((uint32_t)ExportID::Input);
     registry.exportColumn<GBMachine, GBObs>((uint32_t)ExportID::Observation);
+    registry.exportColumn<GBMachine, GBRam>((uint32_t)ExportID::Ram);
+    registry.exportColumn<GBMachine, GBVram>((uint32_t)ExportID::Vram);
+    registry.exportColumn<GBMachine, GBMbcRam>((uint32_t)ExportID::MbcRam);
 }
 
 void Sim::setupTasks(TaskGraphManager &mgr, const Config &)

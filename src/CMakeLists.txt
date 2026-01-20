@@ -129,4 +129,19 @@ if (TARGET madrona_mw_gpu)
     target_compile_definitions(headless_gpu PRIVATE
         DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
     )
+
+    add_executable(compare_cpu_gpu compare_cpu_gpu.cpp)
+
+    target_link_libraries(compare_cpu_gpu PRIVATE
+        madrona_mw_cpu
+        madrona_mw_gpu
+        madrona_mw_core
+        madrona_common
+        madrona_sameboy_sim
+        madrona_sameboy_gpu_srcs
+    )
+
+    target_compile_definitions(compare_cpu_gpu PRIVATE
+        DEFAULT_ROM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cpu_instrs.gb"
+    )
 endif()

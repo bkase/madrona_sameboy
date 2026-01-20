@@ -20,6 +20,9 @@ enum class TaskGraphID : uint32_t {
 enum class ExportID : uint32_t {
     Input,
     Observation,
+    Ram,
+    Vram,
+    MbcRam,
     NumExports,
 };
 

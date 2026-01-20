@@ -14,3 +14,4 @@
 - 2026-01-20: Added a fast_ppu flag; GB_advance_cycles now routes to GB_display_run_scanline when enabled.
 - 2026-01-20: CPU Sim init now marks WRAM/VRAM/MBC RAM/ROM bindings as external to avoid frees when using SoA buffers.
 - 2026-01-20: headless_gpu uses a device-allocated ROM pointer (cudaMalloc/cudaMemcpy) passed via Sim::Config; verified 60-frame run.
+- 2026-01-20: compare_cpu_gpu harness hashes WRAM/VRAM/MBC RAM; cpu_instrs.gb 120f currently mismatches across all three buffers.
