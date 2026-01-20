@@ -20,15 +20,23 @@ set(SAMEBOY_CORE_SRCS
 
 set(SAMEBOY_CORE_GPU_TU "${CMAKE_CURRENT_SOURCE_DIR}/sameboy_core_gpu.cpp")
 
-add_library(sameboy_core STATIC ${SAMEBOY_CORE_SRCS})
-target_include_directories(sameboy_core PUBLIC ${SAMEBOY_CORE_DIR})
-target_compile_definitions(sameboy_core PRIVATE
+set(SAMEBOY_COMMON_DEFS
     GB_INTERNAL
-    GB_VERSION=\"0.0\"
     GB_DISABLE_DEBUGGER
     GB_DISABLE_CHEATS
     GB_DISABLE_CHEAT_SEARCH
     GB_DISABLE_REWIND
+    GB_DISABLE_TIMEKEEPING
+    GB_DISABLE_AUDIO
+    GB_DISABLE_FILE_IO
+    GB_DMG_ONLY
+)
+
+add_library(sameboy_core STATIC ${SAMEBOY_CORE_SRCS})
+target_include_directories(sameboy_core PUBLIC ${SAMEBOY_CORE_DIR})
+target_compile_definitions(sameboy_core PRIVATE
+    ${SAMEBOY_COMMON_DEFS}
+    GB_VERSION=\"0.0\"
     _GNU_SOURCE  # For ssize_t on Linux
 )
 
@@ -42,11 +50,7 @@ set(SIMULATOR_SRCS
 add_library(madrona_sameboy_sim STATIC ${SIMULATOR_SRCS})
 target_include_directories(madrona_sameboy_sim PUBLIC ${SAMEBOY_CORE_DIR})
 target_compile_definitions(madrona_sameboy_sim PUBLIC
-    GB_INTERNAL
-    GB_DISABLE_DEBUGGER
-    GB_DISABLE_CHEATS
-    GB_DISABLE_CHEAT_SEARCH
-    GB_DISABLE_REWIND
+    ${SAMEBOY_COMMON_DEFS}
 )
 target_link_libraries(madrona_sameboy_sim
     PUBLIC
@@ -90,6 +94,16 @@ target_compile_definitions(headless PRIVATE
 
 # GPU support - only if CUDA 12+ is available
 if (TARGET madrona_mw_gpu)
+    set(SAMEBOY_GPU_DEFS
+        ${SAMEBOY_COMMON_DEFS}
+        GB_GPU_BUILD
+    )
+
+    set(SAMEBOY_GPU_FLAGS "")
+    foreach(def ${SAMEBOY_GPU_DEFS})
+        list(APPEND SAMEBOY_GPU_FLAGS "-D${def}")
+    endforeach()
+
     # Build compile definitions for GPU runtime compilation
     madrona_build_compile_defns(
         OUT_TARGET madrona_sameboy_gpu_srcs
@@ -99,12 +113,7 @@ if (TARGET madrona_mw_gpu)
         CUSTOM_FLAGS
             "-I${CMAKE_CURRENT_SOURCE_DIR}"
             "-I${SAMEBOY_CORE_DIR}"
-            "-DGB_GPU_BUILD"
-            "-DGB_INTERNAL"
-            "-DGB_DISABLE_DEBUGGER"
-            "-DGB_DISABLE_CHEATS"
-            "-DGB_DISABLE_CHEAT_SEARCH"
-            "-DGB_DISABLE_REWIND"
+            ${SAMEBOY_GPU_FLAGS}
     )
 
     add_executable(headless_gpu headless_gpu.cpp)
