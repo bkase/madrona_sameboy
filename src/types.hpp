@@ -68,6 +68,10 @@ struct GBInput {
     uint8_t buttons;
 };
 
+struct GBFrameCounter {
+    uint32_t frameIdx;
+};
+
 struct GBSerial {
     uint8_t curByte;
     uint8_t bitCount;
@@ -89,6 +93,7 @@ struct GBMachine : public madrona::Archetype<
     GBFrameBuffer,
     GBObs,
     GBRegs,
+    GBFrameCounter,
     GBInput
 > {};
 #else
@@ -100,6 +105,7 @@ struct GBMachine : public madrona::Archetype<
     GBFrameBuffer,
     GBObs,
     GBRegs,
+    GBFrameCounter,
     GBInput,
     GBSerial
 > {};

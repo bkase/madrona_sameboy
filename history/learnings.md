@@ -49,3 +49,4 @@
 - 2026-01-20: MADRONA_MWGPU_KERNEL_CACHE must point to a file path that doesn't exist yet; pointing it at a directory triggers a strnlen crash while parsing the cache.
 - 2026-01-20: Multi-block megakernel configs depend on guaranteed occupancy; removing launch-bounds min-blocks lets PGO compile, but exec-config overrides with blocks>1 hang, so real tuning likely requires lowering register pressure or compiling out high-reg code paths.
 - 2026-01-20: A GPU-only --skip-ppu mode that fakes vblank every LCDC_PERIOD yields ~3.1× throughput improvement at 512 worlds, indicating PPU work is a major contributor but not the sole bottleneck. A true CPU/PPU kernel split would require deeper decoupling inside SameBoy’s timing path.
+- 2026-01-20: Rendering every Nth frame (via renderEvery/--render-every) yields a ~2.2× GPU throughput gain at N=4, but still leaves a large gap vs CPU; render decimation helps but emulator CPU/PPU cost remains dominant.

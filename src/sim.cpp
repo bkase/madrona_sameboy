@@ -115,7 +115,7 @@ static bool serialWriteHook(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
 
 void simTick(Engine &ctx, GBState &state, GBRam &wram, GBVram &vram,
              GBMbcRam &mbc, GBFrameBuffer &frame, GBObs &obs,
-             GBRegs &regs, GBInput &input)
+             GBRegs &regs, GBFrameCounter &counter, GBInput &input)
 {
     GB_gameboy_t *gb = &state.gb;
 
@@ -142,13 +142,25 @@ void simTick(Engine &ctx, GBState &state, GBRam &wram, GBVram &vram,
             regs.sp = acc;
             regs.ly = acc;
             regs.stat = acc;
+            counter.frameIdx++;
         }
         return;
     }
 
     for (uint32_t frame_idx = 0; frame_idx < frames_per_step; frame_idx++) {
+        bool force_skip = ctx.data().skipPpu != 0;
+        if (force_skip) {
+            gb->skip_ppu = true;
+        } else if (ctx.data().renderEvery > 1) {
+            gb->skip_ppu =
+                (counter.frameIdx % ctx.data().renderEvery) != 0;
+        } else {
+            gb->skip_ppu = false;
+        }
+
         applyInput(gb, input.buttons);
         GB_run_frame(gb);
+        counter.frameIdx++;
     }
 
     if (!ctx.data().disableRendering) {
@@ -173,6 +185,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<GBFrameBuffer>();
     registry.registerComponent<GBObs>();
     registry.registerComponent<GBRegs>();
+    registry.registerComponent<GBFrameCounter>();
     registry.registerComponent<GBInput>();
 #ifndef MADRONA_GPU_MODE
     registry.registerComponent<GBSerial>();
@@ -200,6 +213,7 @@ void Sim::setupTasks(TaskGraphManager &mgr, const Config &)
             GBFrameBuffer,
             GBObs,
             GBRegs,
+            GBFrameCounter,
             GBInput
         >>({});
 }
@@ -213,6 +227,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     useNullStep = cfg.useNullStep;
     fastPpu = cfg.fastPpu;
     skipPpu = cfg.skipPpu;
+    renderEvery = cfg.renderEvery == 0 ? 1u : cfg.renderEvery;
 
     auto &state = ctx.get<GBState>(machine);
     auto &wram = ctx.get<GBRam>(machine);
@@ -221,6 +236,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     auto &frame = ctx.get<GBFrameBuffer>(machine);
     auto &obs = ctx.get<GBObs>(machine);
     auto &regs = ctx.get<GBRegs>(machine);
+    auto &counter = ctx.get<GBFrameCounter>(machine);
     auto &input = ctx.get<GBInput>(machine);
 #ifndef MADRONA_GPU_MODE
     auto &serial = ctx.get<GBSerial>(machine);
@@ -233,6 +249,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     ::memset(&frame, 0, sizeof(frame));
     ::memset(&obs, 0, sizeof(obs));
     ::memset(&regs, 0, sizeof(regs));
+    ::memset(&counter, 0, sizeof(counter));
 #ifndef MADRONA_GPU_MODE
     ::memset(&serial, 0, sizeof(serial));
 #endif

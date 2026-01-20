@@ -69,6 +69,7 @@ int main(int argc, char **argv)
     bool null_step = false;
     bool fast_ppu = false;
     bool skip_ppu = false;
+    uint32_t render_every = 1;
 
     std::vector<const char *> positional;
     positional.reserve(static_cast<size_t>(argc));
@@ -90,6 +91,18 @@ int main(int argc, char **argv)
         }
         if (std::strcmp(arg, "--skip-ppu") == 0) {
             skip_ppu = true;
+            continue;
+        }
+        if (std::strcmp(arg, "--render-every") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "--render-every requires a value\n");
+                return 2;
+            }
+            render_every = static_cast<uint32_t>(
+                std::strtoul(argv[++i], nullptr, 10));
+            if (render_every == 0) {
+                render_every = 1;
+            }
             continue;
         }
         if (arg[0] == '-') {
@@ -150,6 +163,7 @@ int main(int argc, char **argv)
     sim_cfg.useNullStep = null_step ? 1u : 0u;
     sim_cfg.fastPpu = fast_ppu ? 1u : 0u;
     sim_cfg.skipPpu = skip_ppu ? 1u : 0u;
+    sim_cfg.renderEvery = render_every;
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
