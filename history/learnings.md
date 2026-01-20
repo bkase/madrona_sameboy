@@ -26,3 +26,5 @@
 - 2026-01-20: headless cpu_instrs.gb passes by 6000 frames on CPU (prints "Passed").
 - 2026-01-20: madrona Optimize mode NVJitLink failed when -lto was always passed; restricting -lto to LTO mode fixes NVJitLink errors and allows Optimize GPU compiles.
 - 2026-01-20: headless_gpu in Optimize mode (with runAsync stream) runs ~17 FPS for 1 world; 12000 frames still ~11–12 minutes, so 2-minute timeout remains out of reach without deeper changes.
+- 2026-01-20: Added --benchmark/--bench to headless/headless_gpu to run fixed frames without pass checks; benchmark mode disables rendering in Sim::Config.
+- 2026-01-20: Benchmark results (120 frames): CPU ~30–37k total FPS for 64–256 worlds; GPU ~425 total FPS (64 worlds) and ~783 total FPS (256 worlds), so GPU throughput is far below CPU in current madrona setup.

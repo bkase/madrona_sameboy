@@ -125,21 +125,41 @@ int main(int argc, char **argv)
     uint32_t max_frames = 12000;
     uint32_t num_worlds = 1;
     uint32_t num_workers = 0;
+    bool benchmark_only = false;
 
-    if (argc >= 2) {
-        rom_path = argv[1];
+    std::vector<const char *> positional;
+    positional.reserve(static_cast<size_t>(argc));
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (std::strcmp(arg, "--benchmark") == 0 ||
+            std::strcmp(arg, "--bench") == 0) {
+            benchmark_only = true;
+            continue;
+        }
+        if (arg[0] == '-') {
+            fprintf(stderr, "Unknown option: %s\n", arg);
+            return 2;
+        }
+        positional.push_back(arg);
     }
-    if (argc >= 3) {
-        max_frames = static_cast<uint32_t>(std::strtoul(argv[2], nullptr, 10));
+
+    if (positional.size() >= 1) {
+        rom_path = positional[0];
     }
-    if (argc >= 4) {
-        num_worlds = static_cast<uint32_t>(std::strtoul(argv[3], nullptr, 10));
+    if (positional.size() >= 2) {
+        max_frames = static_cast<uint32_t>(
+            std::strtoul(positional[1], nullptr, 10));
+    }
+    if (positional.size() >= 3) {
+        num_worlds = static_cast<uint32_t>(
+            std::strtoul(positional[2], nullptr, 10));
         if (num_worlds == 0) {
             num_worlds = 1;
         }
     }
-    if (argc >= 5) {
-        num_workers = static_cast<uint32_t>(std::strtoul(argv[4], nullptr, 10));
+    if (positional.size() >= 4) {
+        num_workers = static_cast<uint32_t>(
+            std::strtoul(positional[3], nullptr, 10));
     }
 
     std::vector<uint8_t> rom_data;
@@ -155,7 +175,7 @@ int main(int argc, char **argv)
     Sim::Config sim_cfg {};
     sim_cfg.romData = rom_padded.data();
     sim_cfg.romSize = rom_padded.size();
-    sim_cfg.disableRendering = 0;
+    sim_cfg.disableRendering = benchmark_only ? 1u : 0u;
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
@@ -165,6 +185,11 @@ int main(int argc, char **argv)
         .numWorkers = num_workers,
     }, sim_cfg, world_inits.data(), (CountT)TaskGraphID::NumTaskGraphs);
 
+    auto start = std::chrono::high_resolution_clock::now();
+
+    std::vector<bool> saw_pass;
+    std::vector<bool> saw_fail;
+    std::vector<std::array<char, 18 * 21 + 1>> tile_text;
     struct WorldRefs {
         GBSerial *serial;
         GBVram *vram;
@@ -172,84 +197,90 @@ int main(int argc, char **argv)
         GBState *state;
     };
     std::vector<WorldRefs> worlds;
-    worlds.reserve(num_worlds);
-    for (uint32_t i = 0; i < num_worlds; i++) {
-        auto &ctx = exec.getWorldContext(i);
-        auto machine = ctx.data().machine;
-        worlds.push_back({
-            &ctx.get<GBSerial>(machine),
-            &ctx.get<GBVram>(machine),
-            &ctx.get<GBObs>(machine),
-            &ctx.get<GBState>(machine),
-        });
-    }
-
-    std::vector<bool> saw_pass(num_worlds, false);
-    std::vector<bool> saw_fail(num_worlds, false);
-    std::vector<std::array<char, 18 * 21 + 1>> tile_text(num_worlds);
-    for (auto &buf : tile_text) {
-        buf[0] = '\0';
-    }
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    for (uint32_t frame = 0; frame < max_frames; frame++) {
-        exec.run();
-        bool all_done = true;
+    if (benchmark_only) {
+        for (uint32_t frame = 0; frame < max_frames; frame++) {
+            exec.run();
+        }
+    } else {
+        worlds.reserve(num_worlds);
         for (uint32_t i = 0; i < num_worlds; i++) {
-            if (saw_pass[i] || saw_fail[i]) {
-                continue;
-            }
-            auto &serial = *worlds[i].serial;
-            if (serial.length > 0) {
-                saw_pass[i] = containsToken(serial, "Passed");
-                saw_fail[i] = containsToken(serial, "Failed");
-            }
-            if (!(saw_pass[i] || saw_fail[i])) {
-                auto &buf = tile_text[i];
-                if (decodeTileMapBest(*worlds[i].vram, *worlds[i].state,
-                                      buf.data(), buf.size())) {
-                    saw_pass[i] = std::strstr(buf.data(), "Passed") != nullptr;
-                    saw_fail[i] = std::strstr(buf.data(), "Failed") != nullptr;
+            auto &ctx = exec.getWorldContext(i);
+            auto machine = ctx.data().machine;
+            worlds.push_back({
+                &ctx.get<GBSerial>(machine),
+                &ctx.get<GBVram>(machine),
+                &ctx.get<GBObs>(machine),
+                &ctx.get<GBState>(machine),
+            });
+        }
+
+        saw_pass.assign(num_worlds, false);
+        saw_fail.assign(num_worlds, false);
+        tile_text.resize(num_worlds);
+        for (auto &buf : tile_text) {
+            buf[0] = '\0';
+        }
+
+        for (uint32_t frame = 0; frame < max_frames; frame++) {
+            exec.run();
+            bool all_done = true;
+            for (uint32_t i = 0; i < num_worlds; i++) {
+                if (saw_pass[i] || saw_fail[i]) {
+                    continue;
+                }
+                auto &serial = *worlds[i].serial;
+                if (serial.length > 0) {
+                    saw_pass[i] = containsToken(serial, "Passed");
+                    saw_fail[i] = containsToken(serial, "Failed");
+                }
+                if (!(saw_pass[i] || saw_fail[i])) {
+                    auto &buf = tile_text[i];
+                    if (decodeTileMapBest(*worlds[i].vram, *worlds[i].state,
+                                          buf.data(), buf.size())) {
+                        saw_pass[i] = std::strstr(buf.data(), "Passed") != nullptr;
+                        saw_fail[i] = std::strstr(buf.data(), "Failed") != nullptr;
+                    }
+                }
+                if (!(saw_pass[i] || saw_fail[i])) {
+                    all_done = false;
                 }
             }
-            if (!(saw_pass[i] || saw_fail[i])) {
-                all_done = false;
+            if (all_done) {
+                break;
             }
-        }
-        if (all_done) {
-            break;
         }
     }
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    auto &serial0 = *worlds[0].serial;
-    if (serial0.length > 0) {
-        fputs(serial0.text, stdout);
-        if (serial0.text[serial0.length - 1] != '\n') {
-            fputc('\n', stdout);
+    if (!benchmark_only) {
+        auto &serial0 = *worlds[0].serial;
+        if (serial0.length > 0) {
+            fputs(serial0.text, stdout);
+            if (serial0.text[serial0.length - 1] != '\n') {
+                fputc('\n', stdout);
+            }
+        } else if (tile_text[0][0] != '\0') {
+            fputs(tile_text[0].data(), stdout);
+        } else {
+            fprintf(stderr, "No serial output after %u frames\n", max_frames);
         }
-    } else if (tile_text[0][0] != '\0') {
-        fputs(tile_text[0].data(), stdout);
-    } else {
-        fprintf(stderr, "No serial output after %u frames\n", max_frames);
-    }
 
-    uint8_t min_pix = 255;
-    uint8_t max_pix = 0;
-    for (uint32_t i = 0; i < consts::screenPixels; i++) {
-        uint8_t v = worlds[0].obs->pixels[i];
-        if (v < min_pix) min_pix = v;
-        if (v > max_pix) max_pix = v;
-    }
+        uint8_t min_pix = 255;
+        uint8_t max_pix = 0;
+        for (uint32_t i = 0; i < consts::screenPixels; i++) {
+            uint8_t v = worlds[0].obs->pixels[i];
+            if (v < min_pix) min_pix = v;
+            if (v > max_pix) max_pix = v;
+        }
 
-    fprintf(stderr, "Serial writes: SB=%u SC=%u, obs range=[%u,%u]\n",
-            serial0.sbWrites, serial0.scWrites, min_pix, max_pix);
-    fprintf(stderr, "PC=0x%04X SP=0x%04X LCDC=0x%02X\n",
-            worlds[0].state->gb.pc, worlds[0].state->gb.sp,
-            worlds[0].state->gb.io_registers[GB_IO_LCDC]);
+        fprintf(stderr, "Serial writes: SB=%u SC=%u, obs range=[%u,%u]\n",
+                serial0.sbWrites, serial0.scWrites, min_pix, max_pix);
+        fprintf(stderr, "PC=0x%04X SP=0x%04X LCDC=0x%02X\n",
+                worlds[0].state->gb.pc, worlds[0].state->gb.sp,
+                worlds[0].state->gb.io_registers[GB_IO_LCDC]);
+    }
 
     // Performance output
     double total_seconds = duration.count() / 1000000.0;
@@ -263,6 +294,10 @@ int main(int argc, char **argv)
     fprintf(stderr, "  Time: %.3f seconds\n", total_seconds);
     fprintf(stderr, "  Total throughput: %.2f frames/sec\n", frames_per_sec);
     fprintf(stderr, "  Per-world rate: %.2f FPS\n", fps_per_world);
+
+    if (benchmark_only) {
+        return 0;
+    }
 
     bool any_fail = false;
     bool all_pass = true;

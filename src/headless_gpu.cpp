@@ -64,21 +64,41 @@ int main(int argc, char **argv)
     uint32_t max_frames = 12000;
     uint32_t num_worlds = 1;
     int gpu_id = 0;
+    bool benchmark_only = false;
 
-    if (argc >= 2) {
-        rom_path = argv[1];
+    std::vector<const char *> positional;
+    positional.reserve(static_cast<size_t>(argc));
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (std::strcmp(arg, "--benchmark") == 0 ||
+            std::strcmp(arg, "--bench") == 0) {
+            benchmark_only = true;
+            continue;
+        }
+        if (arg[0] == '-') {
+            fprintf(stderr, "Unknown option: %s\n", arg);
+            return 2;
+        }
+        positional.push_back(arg);
     }
-    if (argc >= 3) {
-        max_frames = static_cast<uint32_t>(std::strtoul(argv[2], nullptr, 10));
+
+    if (positional.size() >= 1) {
+        rom_path = positional[0];
     }
-    if (argc >= 4) {
-        num_worlds = static_cast<uint32_t>(std::strtoul(argv[3], nullptr, 10));
+    if (positional.size() >= 2) {
+        max_frames = static_cast<uint32_t>(
+            std::strtoul(positional[1], nullptr, 10));
+    }
+    if (positional.size() >= 3) {
+        num_worlds = static_cast<uint32_t>(
+            std::strtoul(positional[2], nullptr, 10));
         if (num_worlds == 0) {
             num_worlds = 1;
         }
     }
-    if (argc >= 5) {
-        gpu_id = static_cast<int>(std::strtol(argv[4], nullptr, 10));
+    if (positional.size() >= 4) {
+        gpu_id = static_cast<int>(
+            std::strtol(positional[3], nullptr, 10));
     }
 
     std::vector<uint8_t> rom_data;
@@ -176,9 +196,11 @@ int main(int argc, char **argv)
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    // Copy observation back to check results
-    cudaMemcpy(h_obs.data(), d_obs, sizeof(GBObs) * num_worlds,
-               cudaMemcpyDeviceToHost);
+    if (!benchmark_only) {
+        // Copy observation back to check results
+        cudaMemcpy(h_obs.data(), d_obs, sizeof(GBObs) * num_worlds,
+                   cudaMemcpyDeviceToHost);
+    }
 
     // Calculate performance metrics
     double total_seconds = duration.count() / 1000000.0;
@@ -188,10 +210,12 @@ int main(int argc, char **argv)
     // Check observation pixel range
     uint8_t min_pix = 255;
     uint8_t max_pix = 0;
-    for (uint32_t i = 0; i < consts::screenPixels; i++) {
-        uint8_t v = h_obs[0].pixels[i];
-        if (v < min_pix) min_pix = v;
-        if (v > max_pix) max_pix = v;
+    if (!benchmark_only) {
+        for (uint32_t i = 0; i < consts::screenPixels; i++) {
+            uint8_t v = h_obs[0].pixels[i];
+            if (v < min_pix) min_pix = v;
+            if (v > max_pix) max_pix = v;
+        }
     }
 
     printf("GPU Performance Results:\n");
@@ -201,7 +225,9 @@ int main(int argc, char **argv)
     printf("  Time: %.3f seconds\n", total_seconds);
     printf("  Total throughput: %.2f frames/sec\n", frames_per_sec);
     printf("  Per-world rate: %.2f FPS\n", fps_per_world);
-    printf("  Observation range: [%u, %u]\n", min_pix, max_pix);
+    if (!benchmark_only) {
+        printf("  Observation range: [%u, %u]\n", min_pix, max_pix);
+    }
 
     cudaStreamDestroy(stream);
     cudaFree(d_rom);
