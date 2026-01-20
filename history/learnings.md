@@ -37,3 +37,8 @@
 - 2026-01-20: Enabling MADRONA_MWGPU_ENABLE_PGO to build multi-block megakernel variants fails NVJitLink (max-regcount mismatch), blocking occupancy/blocks-per-SM tuning without fixing the regcount constraint.
 - 2026-01-20: Null-step baseline (skipping GB_run_frame) runs orders of magnitude faster on GPU (~27.7M fps total at 512 worlds), indicating ECS/SoA layout is not the dominant bottleneck; emulator compute/branching likely is.
 - 2026-01-20: Enabling fast_ppu on GPU causes CUDA_ERROR_ILLEGAL_ADDRESS during teardown, so the fast_ppu path is not GPU-safe and can't be used yet to assess PPU cost.
+- 2026-01-20: compute-sanitizer on fast_ppu (1 world) still reports invalid global write in madrona StateManager::makeEntityNow during initWorlds, suggesting a lingering GPU init bug independent of fast_ppu.
+- 2026-01-20: compute-sanitizer on --null-step (1 world) hits the same StateManager::makeEntityNow invalid write, so the initWorlds bug is independent of emulation and likely in Madrona GPU ECS init.
+- 2026-01-20: fast_ppu runs succeed at 1 world but crash at 512 worlds, indicating the illegal access scales with world count rather than being immediate for a single world.
+- 2026-01-20: Reverting GBMachine max entities per world to default (0) does not remove compute-sanitizer invalid write in StateManager::makeEntityNow (initWorlds), so the error is not caused by the max-entities override; memcheck reports the fault within a 2MB allocation at +0x4.
+- 2026-01-20: MADRONA_MWGPU_VERBOSE_HOSTALLOC=1 shows entity/world columns allocate 8 and 4 bytes for 1 world and the run completes, so either compute-sanitizer is flagging Madrona’s virtual-memory allocations or there is a subtle init write issue that does not crash at low world counts.
