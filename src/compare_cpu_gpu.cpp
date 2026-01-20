@@ -331,6 +331,7 @@ int main(int argc, char **argv)
     cpu_cfg.romData = rom_padded.data();
     cpu_cfg.romSize = rom_padded.size();
     cpu_cfg.disableRendering = 0;
+    cpu_cfg.framesPerStep = 1;
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
     TaskGraphExecutor<Engine, Sim, Sim::Config, Sim::WorldInit> cpu_exec({
@@ -370,6 +371,7 @@ int main(int argc, char **argv)
     gpu_cfg.romData = d_rom;
     gpu_cfg.romSize = rom_padded.size();
     gpu_cfg.disableRendering = 0;
+    gpu_cfg.framesPerStep = 1;
 
     static const char *user_sources[] = {
         MADRONA_SAMEBOY_SIM_SRCS

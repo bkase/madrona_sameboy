@@ -124,8 +124,14 @@ void simTick(Engine &ctx, GBState &state, GBRam &wram, GBVram &vram,
     gb->mbc_ram = mbc.data;
     gb->screen = frame.pixels;
 
-    applyInput(gb, input.buttons);
-    GB_run_frame(gb);
+    uint32_t frames_per_step = ctx.data().framesPerStep;
+    if (frames_per_step == 0) {
+        frames_per_step = 1;
+    }
+    for (uint32_t frame_idx = 0; frame_idx < frames_per_step; frame_idx++) {
+        applyInput(gb, input.buttons);
+        GB_run_frame(gb);
+    }
 
     if (!ctx.data().disableRendering) {
         for (uint32_t i = 0; i < consts::screenPixels; i++) {
@@ -185,6 +191,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
 {
     machine = ctx.makeEntity<GBMachine>();
     disableRendering = cfg.disableRendering;
+    framesPerStep = cfg.framesPerStep == 0 ? 1u : cfg.framesPerStep;
 
     auto &state = ctx.get<GBState>(machine);
     auto &wram = ctx.get<GBRam>(machine);

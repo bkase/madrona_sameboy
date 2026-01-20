@@ -64,6 +64,7 @@ int main(int argc, char **argv)
     uint32_t max_frames = 12000;
     uint32_t num_worlds = 1;
     int gpu_id = 0;
+    uint32_t frames_per_step = 1;
     bool benchmark_only = false;
 
     std::vector<const char *> positional;
@@ -100,6 +101,13 @@ int main(int argc, char **argv)
         gpu_id = static_cast<int>(
             std::strtol(positional[3], nullptr, 10));
     }
+    if (positional.size() >= 5) {
+        frames_per_step = static_cast<uint32_t>(
+            std::strtoul(positional[4], nullptr, 10));
+        if (frames_per_step == 0) {
+            frames_per_step = 1;
+        }
+    }
 
     std::vector<uint8_t> rom_data;
     if (!readFile(rom_path, rom_data)) {
@@ -122,6 +130,7 @@ int main(int argc, char **argv)
     sim_cfg.romData = d_rom;
     sim_cfg.romSize = rom_padded.size();
     sim_cfg.disableRendering = 1;
+    sim_cfg.framesPerStep = frames_per_step;
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
@@ -176,7 +185,9 @@ int main(int argc, char **argv)
     cudaMemcpy(d_input, h_input.data(), sizeof(GBInput) * num_worlds,
                cudaMemcpyHostToDevice);
 
-    fprintf(stderr, "Running %u frames on GPU...\n", max_frames);
+    uint64_t frames_per_world = (uint64_t)max_frames * frames_per_step;
+    fprintf(stderr, "Running %llu frames on GPU...\n",
+            static_cast<unsigned long long>(frames_per_world));
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -203,9 +214,10 @@ int main(int argc, char **argv)
     }
 
     // Calculate performance metrics
+    uint64_t total_frames = frames_per_world * num_worlds;
     double total_seconds = duration.count() / 1000000.0;
-    double frames_per_sec = (double)(max_frames * num_worlds) / total_seconds;
-    double fps_per_world = (double)max_frames / total_seconds;
+    double frames_per_sec = (double)total_frames / total_seconds;
+    double fps_per_world = (double)frames_per_world / total_seconds;
 
     // Check observation pixel range
     uint8_t min_pix = 255;
@@ -220,8 +232,10 @@ int main(int argc, char **argv)
 
     printf("GPU Performance Results:\n");
     printf("  Worlds: %u\n", num_worlds);
-    printf("  Frames per world: %u\n", max_frames);
-    printf("  Total frames: %u\n", max_frames * num_worlds);
+    printf("  Frames per world: %llu\n",
+           static_cast<unsigned long long>(frames_per_world));
+    printf("  Total frames: %llu\n",
+           static_cast<unsigned long long>(total_frames));
     printf("  Time: %.3f seconds\n", total_seconds);
     printf("  Total throughput: %.2f frames/sec\n", frames_per_sec);
     printf("  Per-world rate: %.2f FPS\n", fps_per_world);

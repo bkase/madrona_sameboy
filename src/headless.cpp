@@ -125,6 +125,7 @@ int main(int argc, char **argv)
     uint32_t max_frames = 12000;
     uint32_t num_worlds = 1;
     uint32_t num_workers = 0;
+    uint32_t frames_per_step = 1;
     bool benchmark_only = false;
 
     std::vector<const char *> positional;
@@ -161,6 +162,13 @@ int main(int argc, char **argv)
         num_workers = static_cast<uint32_t>(
             std::strtoul(positional[3], nullptr, 10));
     }
+    if (positional.size() >= 5) {
+        frames_per_step = static_cast<uint32_t>(
+            std::strtoul(positional[4], nullptr, 10));
+        if (frames_per_step == 0) {
+            frames_per_step = 1;
+        }
+    }
 
     std::vector<uint8_t> rom_data;
     if (!readFile(rom_path, rom_data)) {
@@ -176,6 +184,7 @@ int main(int argc, char **argv)
     sim_cfg.romData = rom_padded.data();
     sim_cfg.romSize = rom_padded.size();
     sim_cfg.disableRendering = benchmark_only ? 1u : 0u;
+    sim_cfg.framesPerStep = frames_per_step;
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
@@ -264,7 +273,8 @@ int main(int argc, char **argv)
         } else if (tile_text[0][0] != '\0') {
             fputs(tile_text[0].data(), stdout);
         } else {
-            fprintf(stderr, "No serial output after %u frames\n", max_frames);
+            fprintf(stderr, "No serial output after %llu frames\n",
+                    static_cast<unsigned long long>(max_frames) * frames_per_step);
         }
 
         uint8_t min_pix = 255;
@@ -283,14 +293,18 @@ int main(int argc, char **argv)
     }
 
     // Performance output
+    uint64_t frames_per_world = (uint64_t)max_frames * frames_per_step;
+    uint64_t total_frames = frames_per_world * num_worlds;
     double total_seconds = duration.count() / 1000000.0;
-    double frames_per_sec = (double)(max_frames * num_worlds) / total_seconds;
-    double fps_per_world = (double)max_frames / total_seconds;
+    double frames_per_sec = (double)total_frames / total_seconds;
+    double fps_per_world = (double)frames_per_world / total_seconds;
 
     fprintf(stderr, "\nCPU Performance Results:\n");
     fprintf(stderr, "  Worlds: %u\n", num_worlds);
-    fprintf(stderr, "  Frames per world: %u\n", max_frames);
-    fprintf(stderr, "  Total frames: %u\n", max_frames * num_worlds);
+    fprintf(stderr, "  Frames per world: %llu\n",
+            static_cast<unsigned long long>(frames_per_world));
+    fprintf(stderr, "  Total frames: %llu\n",
+            static_cast<unsigned long long>(total_frames));
     fprintf(stderr, "  Time: %.3f seconds\n", total_seconds);
     fprintf(stderr, "  Total throughput: %.2f frames/sec\n", frames_per_sec);
     fprintf(stderr, "  Per-world rate: %.2f FPS\n", fps_per_world);
