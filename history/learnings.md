@@ -21,3 +21,8 @@
 - 2026-01-20: compare_cpu_gpu --report build/diff_report.json writes JSON even on failure; cpu_instrs.gb 120f still diverges across WRAM/VRAM/MBC/obs/regs.
 - 2026-01-20: headless cpu_instrs.gb passes at 12000 frames on CPU; headless_gpu 12000f did not complete within 120s/300s/600s timeouts (still running after init).
 - 2026-01-20: Enabled warnings-as-errors for project targets; SameBoy headers are treated as system and sameboy_core suppresses multichar/unused-result warnings so Werror builds succeed.
+- 2026-01-20: headless_gpu in Debug opt mode runs ~2 FPS for 1 world (120 frames took ~60s), so 12000 frames would take ~100 min; perceived hang is extreme slowness.
+- 2026-01-20: compute-sanitizer memcheck on headless_gpu (10 frames) reports invalid global write in StateManager::makeEntityNow (state.cpp:523) during initWorlds, followed by unspecified launch failure.
+- 2026-01-20: headless cpu_instrs.gb passes by 6000 frames on CPU (prints "Passed").
+- 2026-01-20: madrona Optimize mode NVJitLink failed when -lto was always passed; restricting -lto to LTO mode fixes NVJitLink errors and allows Optimize GPU compiles.
+- 2026-01-20: headless_gpu in Optimize mode (with runAsync stream) runs ~17 FPS for 1 world; 12000 frames still ~11–12 minutes, so 2-minute timeout remains out of reach without deeper changes.

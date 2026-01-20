@@ -31,6 +31,7 @@ struct Sim : public madrona::WorldBase {
     struct Config {
         uint8_t *romData;
         size_t romSize;
+        uint32_t disableRendering;
     };
 
     struct WorldInit {};
@@ -43,6 +44,7 @@ struct Sim : public madrona::WorldBase {
     Sim(Engine &ctx, const Config &cfg, const WorldInit &);
 
     madrona::Entity machine;
+    uint32_t disableRendering;
 };
 
 class Engine : public madrona::CustomContext<Engine, Sim> {

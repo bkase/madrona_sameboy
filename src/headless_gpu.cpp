@@ -101,6 +101,7 @@ int main(int argc, char **argv)
     Sim::Config sim_cfg {};
     sim_cfg.romData = d_rom;
     sim_cfg.romSize = rom_padded.size();
+    sim_cfg.disableRendering = 1;
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
@@ -128,7 +129,7 @@ int main(int argc, char **argv)
     CompileConfig compile_cfg {
         .userSources = {user_sources, std::size(user_sources)},
         .userCompileFlags = {user_compile_flags, std::size(user_compile_flags)},
-        .optMode = CompileConfig::OptMode::Debug,
+        .optMode = CompileConfig::OptMode::Optimize,
     };
 
     fprintf(stderr, "Compiling GPU kernels for %u worlds...\n", num_worlds);
@@ -159,12 +160,18 @@ int main(int argc, char **argv)
 
     auto start = std::chrono::high_resolution_clock::now();
 
+    cudaStream_t stream = nullptr;
+    if (cudaStreamCreate(&stream) != cudaSuccess) {
+        fprintf(stderr, "Failed to create CUDA stream\n");
+        return 3;
+    }
+
     for (uint32_t frame = 0; frame < max_frames; frame++) {
-        exec.run(step_graph);
+        exec.runAsync(step_graph, stream);
     }
 
     // Sync to ensure all work is done
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(stream);
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -196,6 +203,7 @@ int main(int argc, char **argv)
     printf("  Per-world rate: %.2f FPS\n", fps_per_world);
     printf("  Observation range: [%u, %u]\n", min_pix, max_pix);
 
+    cudaStreamDestroy(stream);
     cudaFree(d_rom);
 
     return 0;

@@ -113,7 +113,7 @@ static bool serialWriteHook(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
 
 } // namespace
 
-void simTick(Engine &, GBState &state, GBRam &wram, GBVram &vram,
+void simTick(Engine &ctx, GBState &state, GBRam &wram, GBVram &vram,
              GBMbcRam &mbc, GBFrameBuffer &frame, GBObs &obs,
              GBRegs &regs, GBInput &input)
 {
@@ -127,9 +127,11 @@ void simTick(Engine &, GBState &state, GBRam &wram, GBVram &vram,
     applyInput(gb, input.buttons);
     GB_run_frame(gb);
 
-    for (uint32_t i = 0; i < consts::screenPixels; i++) {
-        uint8_t gray = (uint8_t)(frame.pixels[i] & 0xFFu);
-        obs.pixels[i] = (uint8_t)(3 - (gray >> 6));
+    if (!ctx.data().disableRendering) {
+        for (uint32_t i = 0; i < consts::screenPixels; i++) {
+            uint8_t gray = (uint8_t)(frame.pixels[i] & 0xFFu);
+            obs.pixels[i] = (uint8_t)(3 - (gray >> 6));
+        }
     }
 
     regs.pc = gb->pc;
@@ -182,6 +184,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     : WorldBase(ctx)
 {
     machine = ctx.makeEntity<GBMachine>();
+    disableRendering = cfg.disableRendering;
 
     auto &state = ctx.get<GBState>(machine);
     auto &wram = ctx.get<GBRam>(machine);
@@ -279,6 +282,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     GB_set_border_mode(gb, GB_BORDER_NEVER);
     GB_set_rgb_encode_callback(gb, rgbEncode);
     GB_set_pixels_output(gb, frame.pixels);
+    GB_set_rendering_disabled(gb, cfg.disableRendering != 0);
 
 #ifndef MADRONA_GPU_MODE
     GB_set_user_data(gb, &serial);

@@ -155,6 +155,7 @@ int main(int argc, char **argv)
     Sim::Config sim_cfg {};
     sim_cfg.romData = rom_padded.data();
     sim_cfg.romSize = rom_padded.size();
+    sim_cfg.disableRendering = 0;
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
