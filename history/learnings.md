@@ -16,3 +16,4 @@
 - 2026-01-20: headless_gpu uses a device-allocated ROM pointer (cudaMalloc/cudaMemcpy) passed via Sim::Config; verified 60-frame run.
 - 2026-01-20: compare_cpu_gpu harness hashes WRAM/VRAM/MBC RAM; cpu_instrs.gb 120f currently mismatches across all three buffers.
 - 2026-01-20: compare_cpu_gpu now also hashes packed observations; cpu_instrs.gb 120f mismatches ObsPacked too.
+- 2026-01-20: compare_cpu_gpu now exports per-frame PC/SP/LY/STAT; cpu_instrs.gb 120f shows register mismatch too.

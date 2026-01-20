@@ -42,6 +42,14 @@ struct GBObsPacked {
     uint8_t bytes[consts::screenPixels / 4];
 };
 
+struct GBRegs {
+    uint16_t pc;
+    uint16_t sp;
+    uint8_t ly;
+    uint8_t stat;
+    uint8_t _pad[2];
+};
+
 struct GBInput {
     uint8_t buttons;
 };
@@ -66,6 +74,7 @@ struct GBMachine : public madrona::Archetype<
     GBMbcRam,
     GBFrameBuffer,
     GBObs,
+    GBRegs,
     GBInput
 > {};
 #else
@@ -76,6 +85,7 @@ struct GBMachine : public madrona::Archetype<
     GBMbcRam,
     GBFrameBuffer,
     GBObs,
+    GBRegs,
     GBInput,
     GBSerial
 > {};

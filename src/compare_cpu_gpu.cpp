@@ -179,6 +179,8 @@ int main(int argc, char **argv)
         cpu_exec.getExported((uint32_t)ExportID::MbcRam));
     auto *cpu_obs = static_cast<GBObs *>(
         cpu_exec.getExported((uint32_t)ExportID::Observation));
+    auto *cpu_regs = static_cast<GBRegs *>(
+        cpu_exec.getExported((uint32_t)ExportID::Regs));
 
     for (uint32_t i = 0; i < num_worlds; i++) {
         cpu_input[i].buttons = 0;
@@ -237,6 +239,8 @@ int main(int argc, char **argv)
         gpu_exec.getExported((uint32_t)ExportID::MbcRam));
     auto *d_obs = static_cast<GBObs *>(
         gpu_exec.getExported((uint32_t)ExportID::Observation));
+    auto *d_regs = static_cast<GBRegs *>(
+        gpu_exec.getExported((uint32_t)ExportID::Regs));
 
     std::vector<GBInput> h_input(num_worlds);
     for (auto &in : h_input) {
@@ -255,6 +259,7 @@ int main(int argc, char **argv)
     std::vector<GBVram> h_vram(num_worlds);
     std::vector<GBMbcRam> h_mbc(num_worlds);
     std::vector<GBObs> h_obs(num_worlds);
+    std::vector<GBRegs> h_regs(num_worlds);
 
     cudaMemcpy(h_wram.data(), d_wram, sizeof(GBRam) * num_worlds,
                cudaMemcpyDeviceToHost);
@@ -263,6 +268,8 @@ int main(int argc, char **argv)
     cudaMemcpy(h_mbc.data(), d_mbc, sizeof(GBMbcRam) * num_worlds,
                cudaMemcpyDeviceToHost);
     cudaMemcpy(h_obs.data(), d_obs, sizeof(GBObs) * num_worlds,
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_regs.data(), d_regs, sizeof(GBRegs) * num_worlds,
                cudaMemcpyDeviceToHost);
 
     cudaFree(d_rom);
@@ -300,7 +307,19 @@ int main(int argc, char **argv)
                                     cpu_packed.bytes, gpu_packed.bytes,
                                     sizeof(cpu_packed.bytes));
 
-        all_match = all_match && wram_match && vram_match && mbc_match && obs_match;
+        bool regs_match = true;
+        const GBRegs &cpu_reg = cpu_regs[i];
+        const GBRegs &gpu_reg = h_regs[i];
+        if (cpu_reg.pc != gpu_reg.pc || cpu_reg.sp != gpu_reg.sp ||
+            cpu_reg.ly != gpu_reg.ly || cpu_reg.stat != gpu_reg.stat) {
+            regs_match = false;
+            printf("Regs mismatch: cpu PC=0x%04x SP=0x%04x LY=%u STAT=0x%02x "
+                   "gpu PC=0x%04x SP=0x%04x LY=%u STAT=0x%02x\n",
+                   cpu_reg.pc, cpu_reg.sp, cpu_reg.ly, cpu_reg.stat,
+                   gpu_reg.pc, gpu_reg.sp, gpu_reg.ly, gpu_reg.stat);
+        }
+
+        all_match = all_match && wram_match && vram_match && mbc_match && obs_match && regs_match;
     }
 
     return all_match ? 0 : 1;

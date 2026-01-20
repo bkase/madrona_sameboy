@@ -114,7 +114,8 @@ static bool serialWriteHook(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
 } // namespace
 
 void simTick(Engine &, GBState &state, GBRam &wram, GBVram &vram,
-             GBMbcRam &mbc, GBFrameBuffer &frame, GBObs &obs, GBInput &input)
+             GBMbcRam &mbc, GBFrameBuffer &frame, GBObs &obs,
+             GBRegs &regs, GBInput &input)
 {
     GB_gameboy_t *gb = &state.gb;
 
@@ -130,6 +131,11 @@ void simTick(Engine &, GBState &state, GBRam &wram, GBVram &vram,
         uint8_t gray = (uint8_t)(frame.pixels[i] & 0xFFu);
         obs.pixels[i] = (uint8_t)(3 - (gray >> 6));
     }
+
+    regs.pc = gb->pc;
+    regs.sp = gb->sp;
+    regs.ly = gb->io_registers[GB_IO_LY];
+    regs.stat = gb->io_registers[GB_IO_STAT];
 }
 
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
@@ -140,6 +146,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<GBMbcRam>();
     registry.registerComponent<GBFrameBuffer>();
     registry.registerComponent<GBObs>();
+    registry.registerComponent<GBRegs>();
     registry.registerComponent<GBInput>();
 #ifndef MADRONA_GPU_MODE
     registry.registerComponent<GBSerial>();
@@ -152,6 +159,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.exportColumn<GBMachine, GBRam>((uint32_t)ExportID::Ram);
     registry.exportColumn<GBMachine, GBVram>((uint32_t)ExportID::Vram);
     registry.exportColumn<GBMachine, GBMbcRam>((uint32_t)ExportID::MbcRam);
+    registry.exportColumn<GBMachine, GBRegs>((uint32_t)ExportID::Regs);
 }
 
 void Sim::setupTasks(TaskGraphManager &mgr, const Config &)
@@ -165,6 +173,7 @@ void Sim::setupTasks(TaskGraphManager &mgr, const Config &)
             GBMbcRam,
             GBFrameBuffer,
             GBObs,
+            GBRegs,
             GBInput
         >>({});
 }
@@ -180,6 +189,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     auto &mbc = ctx.get<GBMbcRam>(machine);
     auto &frame = ctx.get<GBFrameBuffer>(machine);
     auto &obs = ctx.get<GBObs>(machine);
+    auto &regs = ctx.get<GBRegs>(machine);
     auto &input = ctx.get<GBInput>(machine);
 #ifndef MADRONA_GPU_MODE
     auto &serial = ctx.get<GBSerial>(machine);
@@ -191,6 +201,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     ::memset(&mbc, 0, sizeof(mbc));
     ::memset(&frame, 0, sizeof(frame));
     ::memset(&obs, 0, sizeof(obs));
+    ::memset(&regs, 0, sizeof(regs));
 #ifndef MADRONA_GPU_MODE
     ::memset(&serial, 0, sizeof(serial));
 #endif

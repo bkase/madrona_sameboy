@@ -23,6 +23,7 @@ enum class ExportID : uint32_t {
     Ram,
     Vram,
     MbcRam,
+    Regs,
     NumExports,
 };
 
