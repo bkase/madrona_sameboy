@@ -34,6 +34,7 @@ struct Sim : public madrona::WorldBase {
         uint32_t disableRendering;
         uint32_t framesPerStep;
         uint32_t useNullStep;
+        uint32_t fastPpu;
     };
 
     struct WorldInit {};
@@ -49,6 +50,7 @@ struct Sim : public madrona::WorldBase {
     uint32_t disableRendering;
     uint32_t framesPerStep;
     uint32_t useNullStep;
+    uint32_t fastPpu;
 };
 
 class Engine : public madrona::CustomContext<Engine, Sim> {

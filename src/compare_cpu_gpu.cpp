@@ -333,6 +333,7 @@ int main(int argc, char **argv)
     cpu_cfg.disableRendering = 0;
     cpu_cfg.framesPerStep = 1;
     cpu_cfg.useNullStep = 0;
+    cpu_cfg.fastPpu = 0;
     std::vector<Sim::WorldInit> world_inits(num_worlds);
 
     TaskGraphExecutor<Engine, Sim, Sim::Config, Sim::WorldInit> cpu_exec({
@@ -374,6 +375,7 @@ int main(int argc, char **argv)
     gpu_cfg.disableRendering = 0;
     gpu_cfg.framesPerStep = 1;
     gpu_cfg.useNullStep = 0;
+    gpu_cfg.fastPpu = 0;
 
     static const char *user_sources[] = {
         MADRONA_SAMEBOY_SIM_SRCS

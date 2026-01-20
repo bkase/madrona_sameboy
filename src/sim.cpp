@@ -211,6 +211,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     disableRendering = cfg.disableRendering;
     framesPerStep = cfg.framesPerStep == 0 ? 1u : cfg.framesPerStep;
     useNullStep = cfg.useNullStep;
+    fastPpu = cfg.fastPpu;
 
     auto &state = ctx.get<GBState>(machine);
     auto &wram = ctx.get<GBRam>(machine);
@@ -316,6 +317,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
 #endif
 
     initPostBootState(gb);
+    gb->fast_ppu = fastPpu != 0;
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Sim::Config, Sim::WorldInit);

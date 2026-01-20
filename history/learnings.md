@@ -36,3 +36,4 @@
 - 2026-01-20: Batching multiple frames per step (framesPerStep=4, 512 worlds) did not improve GPU throughput (~1297 fps vs ~1333 fps baseline), so per-launch overhead is not the dominant bottleneck.
 - 2026-01-20: Enabling MADRONA_MWGPU_ENABLE_PGO to build multi-block megakernel variants fails NVJitLink (max-regcount mismatch), blocking occupancy/blocks-per-SM tuning without fixing the regcount constraint.
 - 2026-01-20: Null-step baseline (skipping GB_run_frame) runs orders of magnitude faster on GPU (~27.7M fps total at 512 worlds), indicating ECS/SoA layout is not the dominant bottleneck; emulator compute/branching likely is.
+- 2026-01-20: Enabling fast_ppu on GPU causes CUDA_ERROR_ILLEGAL_ADDRESS during teardown, so the fast_ppu path is not GPU-safe and can't be used yet to assess PPU cost.
