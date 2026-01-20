@@ -18,6 +18,8 @@ set(SAMEBOY_CORE_SRCS
     "${SAMEBOY_CORE_DIR}/workboy.c"
 )
 
+set(SAMEBOY_CORE_GPU_TU "${CMAKE_CURRENT_SOURCE_DIR}/sameboy_core_gpu.cpp")
+
 add_library(sameboy_core STATIC ${SAMEBOY_CORE_SRCS})
 target_include_directories(sameboy_core PUBLIC ${SAMEBOY_CORE_DIR})
 target_compile_definitions(sameboy_core PRIVATE
