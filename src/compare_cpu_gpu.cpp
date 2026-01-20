@@ -68,6 +68,19 @@ static uint64_t hashBytes(const uint8_t *data, size_t size)
     return hash;
 }
 
+static void packObs(const GBObs &obs, GBObsPacked &out)
+{
+    constexpr size_t packed_size = consts::screenPixels / 4;
+    for (size_t i = 0; i < packed_size; i++) {
+        size_t base = i * 4;
+        uint8_t b0 = obs.pixels[base] & 0x3;
+        uint8_t b1 = obs.pixels[base + 1] & 0x3;
+        uint8_t b2 = obs.pixels[base + 2] & 0x3;
+        uint8_t b3 = obs.pixels[base + 3] & 0x3;
+        out.bytes[i] = (uint8_t)(b0 | (b1 << 2) | (b2 << 4) | (b3 << 6));
+    }
+}
+
 struct DiffSummary {
     size_t mismatches;
     size_t first_index;
@@ -164,6 +177,8 @@ int main(int argc, char **argv)
         cpu_exec.getExported((uint32_t)ExportID::Vram));
     auto *cpu_mbc = static_cast<GBMbcRam *>(
         cpu_exec.getExported((uint32_t)ExportID::MbcRam));
+    auto *cpu_obs = static_cast<GBObs *>(
+        cpu_exec.getExported((uint32_t)ExportID::Observation));
 
     for (uint32_t i = 0; i < num_worlds; i++) {
         cpu_input[i].buttons = 0;
@@ -220,6 +235,8 @@ int main(int argc, char **argv)
         gpu_exec.getExported((uint32_t)ExportID::Vram));
     auto *d_mbc = static_cast<GBMbcRam *>(
         gpu_exec.getExported((uint32_t)ExportID::MbcRam));
+    auto *d_obs = static_cast<GBObs *>(
+        gpu_exec.getExported((uint32_t)ExportID::Observation));
 
     std::vector<GBInput> h_input(num_worlds);
     for (auto &in : h_input) {
@@ -237,12 +254,15 @@ int main(int argc, char **argv)
     std::vector<GBRam> h_wram(num_worlds);
     std::vector<GBVram> h_vram(num_worlds);
     std::vector<GBMbcRam> h_mbc(num_worlds);
+    std::vector<GBObs> h_obs(num_worlds);
 
     cudaMemcpy(h_wram.data(), d_wram, sizeof(GBRam) * num_worlds,
                cudaMemcpyDeviceToHost);
     cudaMemcpy(h_vram.data(), d_vram, sizeof(GBVram) * num_worlds,
                cudaMemcpyDeviceToHost);
     cudaMemcpy(h_mbc.data(), d_mbc, sizeof(GBMbcRam) * num_worlds,
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_obs.data(), d_obs, sizeof(GBObs) * num_worlds,
                cudaMemcpyDeviceToHost);
 
     cudaFree(d_rom);
@@ -252,6 +272,12 @@ int main(int argc, char **argv)
         uint64_t cpu_wram_hash = hashBytes(cpu_wram[i].data, sizeof(cpu_wram[i].data));
         uint64_t cpu_vram_hash = hashBytes(cpu_vram[i].data, sizeof(cpu_vram[i].data));
         uint64_t cpu_mbc_hash = hashBytes(cpu_mbc[i].data, sizeof(cpu_mbc[i].data));
+        GBObsPacked cpu_packed {};
+        GBObsPacked gpu_packed {};
+        packObs(cpu_obs[i], cpu_packed);
+        packObs(h_obs[i], gpu_packed);
+        uint64_t cpu_obs_hash = hashBytes(cpu_packed.bytes, sizeof(cpu_packed.bytes));
+        uint64_t gpu_obs_hash = hashBytes(gpu_packed.bytes, sizeof(gpu_packed.bytes));
 
         uint64_t gpu_wram_hash = hashBytes(h_wram[i].data, sizeof(h_wram[i].data));
         uint64_t gpu_vram_hash = hashBytes(h_vram[i].data, sizeof(h_vram[i].data));
@@ -270,8 +296,11 @@ int main(int argc, char **argv)
         bool mbc_match = reportDiff("MBC RAM", cpu_mbc_hash, gpu_mbc_hash,
                                     cpu_mbc[i].data, h_mbc[i].data,
                                     sizeof(cpu_mbc[i].data));
+        bool obs_match = reportDiff("ObsPacked", cpu_obs_hash, gpu_obs_hash,
+                                    cpu_packed.bytes, gpu_packed.bytes,
+                                    sizeof(cpu_packed.bytes));
 
-        all_match = all_match && wram_match && vram_match && mbc_match;
+        all_match = all_match && wram_match && vram_match && mbc_match && obs_match;
     }
 
     return all_match ? 0 : 1;

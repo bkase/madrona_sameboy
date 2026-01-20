@@ -38,6 +38,10 @@ struct GBObs {
     uint8_t pixels[consts::screenPixels];
 };
 
+struct GBObsPacked {
+    uint8_t bytes[consts::screenPixels / 4];
+};
+
 struct GBInput {
     uint8_t buttons;
 };
