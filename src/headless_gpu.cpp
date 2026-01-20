@@ -91,14 +91,18 @@ int main(int argc, char **argv)
     std::vector<uint8_t> rom_padded(padded_size, 0xFF);
     std::memcpy(rom_padded.data(), rom_data.data(), rom_data.size());
 
+    // Initialize CUDA
+    CUcontext cu_ctx = MWCudaExecutor::initCUDA(gpu_id);
+
+    uint8_t *d_rom = nullptr;
+    cudaMalloc(&d_rom, rom_padded.size());
+    cudaMemcpy(d_rom, rom_padded.data(), rom_padded.size(), cudaMemcpyHostToDevice);
+
     Sim::Config sim_cfg {};
-    sim_cfg.romData = rom_padded.data();
+    sim_cfg.romData = d_rom;
     sim_cfg.romSize = rom_padded.size();
 
     std::vector<Sim::WorldInit> world_inits(num_worlds);
-
-    // Initialize CUDA
-    CUcontext cu_ctx = MWCudaExecutor::initCUDA(gpu_id);
 
     // Source files for GPU compilation
     static const char *user_sources[] = {
@@ -124,7 +128,7 @@ int main(int argc, char **argv)
     CompileConfig compile_cfg {
         .userSources = {user_sources, std::size(user_sources)},
         .userCompileFlags = {user_compile_flags, std::size(user_compile_flags)},
-        .optMode = CompileConfig::OptMode::LTO,
+        .optMode = CompileConfig::OptMode::Debug,
     };
 
     fprintf(stderr, "Compiling GPU kernels for %u worlds...\n", num_worlds);
@@ -191,6 +195,8 @@ int main(int argc, char **argv)
     printf("  Total throughput: %.2f frames/sec\n", frames_per_sec);
     printf("  Per-world rate: %.2f FPS\n", fps_per_world);
     printf("  Observation range: [%u, %u]\n", min_pix, max_pix);
+
+    cudaFree(d_rom);
 
     return 0;
 }

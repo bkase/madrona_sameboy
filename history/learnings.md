@@ -9,3 +9,4 @@
 - 2026-01-20: RTC/timekeeping now uses GB_HOST_TIME() (0 on GB_GPU_MODE/GB_DISABLE_TIMEKEEPING) so GPU builds avoid time()/time.h while CPU remains unchanged.
 - 2026-01-20: File-based ROM/save-state/battery/cheat I/O is stubbed to ENOSYS under GB_DISABLE_FILE_IO; buffer-based save-state APIs still work.
 - 2026-01-20: APU/audio is stubbed under GB_DISABLE_AUDIO with no-op helpers and register passthroughs to avoid FILE/std::audio symbols in GPU builds.
+- 2026-01-20: GPU misaligned address faults can come from unaligned uint16_t casts in SameBoy memory.c (OAM/MBC7); use unaligned GB_OAM/GB_MBC read/write helpers under GB_GPU_MODE.

@@ -182,27 +182,47 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     auto &serial = ctx.get<GBSerial>(machine);
 #endif
 
-    std::memset(&state, 0, sizeof(state));
-    std::memset(&wram, 0, sizeof(wram));
-    std::memset(&vram, 0, sizeof(vram));
-    std::memset(&mbc, 0, sizeof(mbc));
-    std::memset(&frame, 0, sizeof(frame));
-    std::memset(&obs, 0, sizeof(obs));
+    ::memset(&state, 0, sizeof(state));
+    ::memset(&wram, 0, sizeof(wram));
+    ::memset(&vram, 0, sizeof(vram));
+    ::memset(&mbc, 0, sizeof(mbc));
+    ::memset(&frame, 0, sizeof(frame));
+    ::memset(&obs, 0, sizeof(obs));
 #ifndef MADRONA_GPU_MODE
-    std::memset(&serial, 0, sizeof(serial));
+    ::memset(&serial, 0, sizeof(serial));
 #endif
     input.buttons = 0;
 
     GB_gameboy_t *gb = &state.gb;
+#ifdef MADRONA_GPU_MODE
+    gb->model = GB_MODEL_DMG_B;
+    gb->ram = wram.data;
+    gb->ram_size = sizeof(wram.data);
+    gb->vram = vram.data;
+    gb->vram_size = sizeof(vram.data);
+    gb->mbc_ram = mbc.data;
+    gb->mbc_ram_size = sizeof(mbc.data);
+    gb->rom = cfg.romData;
+    gb->rom_size = (uint32_t)cfg.romSize;
+    gb->ram_is_external = true;
+    gb->vram_is_external = true;
+    gb->mbc_ram_is_external = true;
+    gb->rom_is_external = true;
+    gb->cartridge_type = &GB_cart_defs[0];
+    gb->clock_multiplier = 1.0;
+    gb->apu_output.max_cycles_per_sample = 0x400;
+    gb->data_bus_decay = 12;
+    GB_reset(gb);
+#else
     GB_init(gb, GB_MODEL_DMG_B);
 
     uint8_t *init_ram = gb->ram;
     uint8_t *init_vram = gb->vram;
     if (init_ram) {
-        std::free(init_ram);
+        ::free(init_ram);
     }
     if (init_vram) {
-        std::free(init_vram);
+        ::free(init_vram);
     }
 
     gb->ram = wram.data;
@@ -214,21 +234,29 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
 
     gb->rom = cfg.romData;
     gb->rom_size = (uint32_t)cfg.romSize;
+#endif
 
     GB_configure_cart(gb);
 
+#ifdef MADRONA_GPU_MODE
+    if (gb->mbc_ram_size > sizeof(mbc.data)) {
+        gb->mbc_ram_size = sizeof(mbc.data);
+    }
+    gb->mbc_ram = mbc.data;
+#else
     if (gb->mbc_ram) {
         size_t mbc_size = gb->mbc_ram_size;
         if (mbc_size > sizeof(mbc.data)) {
             mbc_size = sizeof(mbc.data);
             gb->mbc_ram_size = (uint32_t)mbc_size;
         }
-        std::memcpy(mbc.data, gb->mbc_ram, mbc_size);
-        std::free(gb->mbc_ram);
+        ::memcpy(mbc.data, gb->mbc_ram, mbc_size);
+        ::free(gb->mbc_ram);
         gb->mbc_ram = mbc.data;
     } else {
         gb->mbc_ram = mbc.data;
     }
+#endif
 
     GB_set_border_mode(gb, GB_BORDER_NEVER);
     GB_set_rgb_encode_callback(gb, rgbEncode);
