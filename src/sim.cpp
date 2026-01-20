@@ -212,6 +212,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     framesPerStep = cfg.framesPerStep == 0 ? 1u : cfg.framesPerStep;
     useNullStep = cfg.useNullStep;
     fastPpu = cfg.fastPpu;
+    skipPpu = cfg.skipPpu;
 
     auto &state = ctx.get<GBState>(machine);
     auto &wram = ctx.get<GBRam>(machine);
@@ -310,6 +311,7 @@ Sim::Sim(Engine &ctx, const Config &cfg, const WorldInit &)
     GB_set_rgb_encode_callback(gb, rgbEncode);
     GB_set_pixels_output(gb, frame.pixels);
     GB_set_rendering_disabled(gb, cfg.disableRendering != 0);
+    gb->skip_ppu = skipPpu != 0;
 
 #ifndef MADRONA_GPU_MODE
     GB_set_user_data(gb, &serial);
