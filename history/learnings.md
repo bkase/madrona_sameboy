@@ -11,3 +11,4 @@
 - 2026-01-20: APU/audio is stubbed under GB_DISABLE_AUDIO with no-op helpers and register passthroughs to avoid FILE/std::audio symbols in GPU builds.
 - 2026-01-20: GPU misaligned address faults can come from unaligned uint16_t casts in SameBoy memory.c (OAM/MBC7); use unaligned GB_OAM/GB_MBC read/write helpers under GB_GPU_MODE.
 - 2026-01-20: headless cpu_instrs.gb did not complete within 600 frames in the current build (reached test 9 by 1000 frames).
+- 2026-01-20: Added a fast_ppu flag; GB_advance_cycles now routes to GB_display_run_scanline when enabled.
