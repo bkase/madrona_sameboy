@@ -52,3 +52,4 @@
 - 2026-01-20: Rendering every Nth frame (via renderEvery/--render-every) yields a ~2.2× GPU throughput gain at N=4, but still leaves a large gap vs CPU; render decimation helps but emulator CPU/PPU cost remains dominant.
 - 2026-01-20: SameBoy’s PPU (GB_display_run_scanline / render_line) is stateful and sequential (FIFO, OAM scan, STAT/LY updates per line), so per-world parallelization would require a major PPU rewrite rather than a simple taskgraph change.
 - 2026-01-20: Reset-state caching (CuLE-style) won’t impact current perf measurements because our GPU benchmarks run continuous frames without resets; implementing cache-based resets would require new snapshot/restore plumbing.
+- 2026-01-20: Increasing framesPerStep (batching multiple frames per kernel launch) does not materially improve GPU throughput; gains are marginal at best in current benchmarks.
