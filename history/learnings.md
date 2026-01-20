@@ -7,3 +7,4 @@
 - 2026-01-20: Added GB_init_no_alloc for external RAM/VRAM/MBC/ROM pointers; ownership flags prevent internal free/alloc and MBC RAM realloc.
 - 2026-01-20: Guarded SameBoy core allocations with GB_MALLOC/GB_FREE/GB_REALLOC macros so GB_GPU_MODE builds avoid host malloc/free symbols.
 - 2026-01-20: RTC/timekeeping now uses GB_HOST_TIME() (0 on GB_GPU_MODE/GB_DISABLE_TIMEKEEPING) so GPU builds avoid time()/time.h while CPU remains unchanged.
+- 2026-01-20: File-based ROM/save-state/battery/cheat I/O is stubbed to ENOSYS under GB_DISABLE_FILE_IO; buffer-based save-state APIs still work.
