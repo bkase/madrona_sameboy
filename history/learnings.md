@@ -45,3 +45,4 @@
 - 2026-01-20: GPU runtime compilation can break if gb.h is included in helper stubs early; NVRTC reports "extern C" template errors. Forward-declaring GB_gameboy_t and defining GB_ENUM locally avoids pulling gb.h/save_state.h into the stub TU and fixes NVRTC compilation.
 - 2026-01-20: GPU build now stubs out camera/printer/rumble/sgb/workboy modules via src/sameboy_gpu_stubs.c and removes their .c includes from sameboy_core_gpu.cpp; headless_gpu --benchmark --null-step cpu_instrs.gb 1 1 runs successfully.
 - 2026-01-20: GB_GPU_MODE now bypasses float-heavy color correction paths in display.c (linear RGB scaling only) and skips faux-analog float math in joypad.c; GPU null-step still runs and compiles.
+- 2026-01-20: headless_gpu only copies input once at init and observations at the end (unless --benchmark), so per-frame host↔device copies are not a bottleneck in the current benchmark path.
