@@ -99,6 +99,7 @@ if (TARGET madrona_mw_gpu)
         CUSTOM_FLAGS
             "-I${CMAKE_CURRENT_SOURCE_DIR}"
             "-I${SAMEBOY_CORE_DIR}"
+            "-DGB_GPU_BUILD"
             "-DGB_INTERNAL"
             "-DGB_DISABLE_DEBUGGER"
             "-DGB_DISABLE_CHEATS"
